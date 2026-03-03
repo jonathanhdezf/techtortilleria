@@ -1,0 +1,35 @@
+# Plan de Desarrollo: TechTortilleria
+
+Este documento guiará el desarrollo del proyecto paso a paso, asegurando escalabilidad y cumplimiento de los requerimientos para los 3 módulos principales (POS, Admin y Distribuidores).
+
+## Fase 1: Fundamentos y Autenticación 🔐
+- [ ] Configurar e integrar Supabase Auth con roles de Prisma (`ADMIN`, `CAJERO`, `DISTRIBUIDOR`).
+- [ ] Crear Middleware (`/src/middleware.ts`) para proteger y redirigir rutas según el rol del usuario.
+- [ ] Diseñar el Layout base ([/app/layout.tsx](file:///c:/Users/ACER/.gemini/antigravity/scratch/techtortilleria/src/app/layout.tsx)) con Providers (Theme, Toast, Auth).
+- [ ] Pantalla de Login global (`/app/login/page.tsx`).
+
+## Fase 2: Módulo POS (Punto de Venta - Cajeros) 🏪
+- [ ] Interfaz principal del POS (`/app/pos/page.tsx`) con grilla de productos.
+- [ ] Lógica de Carrito de Compras (Estado global/Context o Zustand).
+- [ ] Módulo de Apertura/Cierre de Caja (`CashRegister`).
+- [ ] Procesamiento de Ventas (`Sale` y `SaleItem`) y actualización de inventario.
+- [ ] Generación e impresión de Tickets (PDF/hmtl2canvas).
+
+## Fase 3: Portal de Distribuidores 🚚
+- [ ] Dashboard del Distribuidor (`/app/distribuidores/page.tsx`) - Estado de límite de crédito y pedidos activos.
+- [ ] Interfaz de Nuevo Pedido (Catálogo con precios especiales `priceDistributor`).
+- [ ] Historial y seguimiento de pedidos (`DistributorOrder`).
+
+## Fase 4: Dashboard Administrativo (Admin) 📊
+- [ ] Dashboard principal (`/app/admin/page.tsx`) con métricas diarias (`DailyMetric`).
+- [ ] Gestión de Productos y Categorías (CRUD).
+- [ ] Gestión de Inventario (`InventoryMovement`) - Entradas, mermas, ajustes.
+- [ ] Gestión de Distribuidores (Aprobación de crédito, límite).
+- [ ] Gestión de Usuarios y Roles (Alta de cajeros/admin).
+- [ ] Reportes y Cajas (Revisión de cortes de caja, historial de ventas).
+
+## Fase 5: Optimización y Pulido ✨
+- [ ] Accesibilidad y Responsive Design (Mobile first para POS y Distribuidores).
+- [ ] Estados de carga (Skeletons) y manejo de errores (Error Boundaries).
+- [ ] Refactorización de componentes UI reutilizables (Botones, Tablas, Modales) en `src/components/ui`.
+- [ ] Testing y QA (Verificar flujos críticos como ventas y pedidos).

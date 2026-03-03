@@ -1,0 +1,51 @@
+# Plan de Implementación: Arquitectura y Roadmap de TechTortilleria
+
+Como Senior Developer, he analizado la estructura actual de base de datos (Prisma) y el stack (Next.js App Router, Tailwind, Shadcn/Radix, Supabase). Propongo la siguiente arquitectura y guía de pasos para escalar el proyecto de forma ordenada y modular.
+
+## User Review Required
+> [!IMPORTANT]
+> Revisa la división de fases y confírmame si estas prioridades se alinean con la visión de producto (Ej: ¿Es el POS más prioritario que el portal de Distribuidores?). Además, confirma si la gestión del estado para el POS la manejaremos con `Zustand` o simplemente con `React Context`.
+
+## Cambios Propuestos / Estructura del Proyecto
+
+### 1. Autenticación y Fundamentos
+- **Objetivo**: Garantizar que cada tipo de usuario aterrice en su módulo correspondiente y no pueda acceder a otras áreas.
+- **Archivos Clave**:
+  - `src/middleware.ts`: Verificará la sesión de Supabase y el rol (Prisma) redirigiendo a `/pos`, `/admin`, o `/distribuidores`.
+  - `src/app/login/page.tsx`: Pantalla única de acceso.
+
+### 2. Módulo POS (Cajeros)
+- **Objetivo**: Interfaz ultra rápida y orientada a teclado/táctil para despachar rápido.
+- **Arquitectura**:
+  - `src/app/pos/layout.tsx`: Header simplificado con estado de la caja y usuario activo.
+  - [src/app/pos/page.tsx](file:///c:/Users/ACER/.gemini/antigravity/scratch/techtortilleria/src/app/pos/page.tsx): Grid visual con productos categorizados y panel lateral derecho con el "Ticket" actual.
+  - Componentes: `<ProductGrid />`, `<CartSidebar />`, `<CheckoutModal />`, `<OpenCloseRegisterModal />`.
+
+### 3. Portal Distribuidores (B2B)
+- **Objetivo**: Autogestión de pedidos de clientes mayoristas.
+- **Arquitectura**:
+  - `src/app/distribuidores/layout.tsx`: Navegación enfocada en "Nuevo Pedido" e "Historial".
+  - `src/app/distribuidores/page.tsx`: Resumen de saldo deudor/límite de crédito y estado del pedido actual (PENDIENTE, EN_RUTA).
+  - Componentes: `<OrderForm />`, `<OrderTrackingTimeline />`.
+
+### 4. Dashboard Administrativo
+- **Objetivo**: Control total sobre el negocio (Inventario, Finanzas, Usuarios).
+- **Arquitectura**:
+  - `src/app/admin/layout.tsx`: Sidebar de navegación con múltiples secciones (Dashboard, Productos, Inventario, Usuarios, Reportes).
+  - Vistas: Gráficos de ventas (Recharts), Tablas de datos (CRUD), aprobaciones de pedidos de distribuidores.
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- Validar mediante el compilador de TypeScript y ESLint (`npm run lint` y `npm run build`) para garantizar que la integración estricta de tipos de Prisma sea correcta en todos los Server Actions.
+
+### Manual Verification
+1. **Flujo de Roles**: 
+   - Iniciar sesión con cuenta ADMIN -> Debe redirigir a `/admin`.
+   - Iniciar sesión con cuenta CAJERO -> Debe redirigir a `/pos`.
+2. **Flujo de Venta (POS)**: 
+   - Abrir caja -> Agregar 3 productos al carrito -> Completar venta en efectivo -> Verificar actualización de inventario y registro de `Sale`.
+3. **Flujo de Distribuidor**: 
+   - Distribuidor crea pedido -> Admin aprueba pedido -> Distribuidor ve estado "APROBADO".
