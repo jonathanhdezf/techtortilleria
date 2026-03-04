@@ -78,7 +78,7 @@ export default function Home() {
             <div className="aspect-square bg-primary/10 rounded-full opacity-30 blur-[100px] absolute -inset-10" />
             <div className="relative aspect-video bg-neutral-black/80 rounded-[40px] border border-white/10 flex items-center justify-center overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.5)] group ring-1 ring-white/20">
               <img
-                src="https://images.unsplash.com/photo-1565299507177-b0ac66763828?q=80&w=1500&auto=format&fit=crop"
+                src="/hero2.png"
                 alt="Proceso de Maíz Premium"
                 className="w-full h-full object-cover rounded-[40px] opacity-70 group-hover:scale-105 transition-transform duration-1000 grayscale hover:grayscale-0"
               />
