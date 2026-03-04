@@ -80,7 +80,7 @@ export default function Home() {
               <img
                 src="/hero2.png"
                 alt="Proceso de Maíz Premium"
-                className="w-full h-full object-cover rounded-[40px] opacity-70 group-hover:scale-105 transition-transform duration-1000 grayscale hover:grayscale-0"
+                className="w-full h-full object-cover rounded-[40px] opacity-70 group-hover:scale-105 transition-transform duration-1000 group-hover:opacity-100"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-neutral-black/80 via-transparent to-transparent" />
               <div className="absolute bottom-8 left-8">
