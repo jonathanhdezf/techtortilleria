@@ -112,9 +112,9 @@ export default function Home() {
             </p>
 
             <div className="space-y-6">
-              <ContactInfo icon={<Mail className="w-5 h-5" />} label="Email Ejecutivo" value="labs@fiberlink.com" />
-              <ContactInfo icon={<Phone className="w-5 h-5" />} label="Línea Directa" value="+52 (55) 8902-3421" />
-              <ContactInfo icon={<MapPin className="w-5 h-5" />} label="Hub Tecnológico" value="Fiberlink HQ, Santa Fe, CDMX" />
+              <ContactInfo icon={<Mail className="w-5 h-5" />} label="Email Ejecutivo" value="fiberlinkserviciostic@gmail.com" />
+              <ContactInfo icon={<Phone className="w-5 h-5" />} label="Línea Directa" value="+52 233 107 2438" />
+              <ContactInfo icon={<MapPin className="w-5 h-5" />} label="Hub Tecnológico" value="Cuauhtémoc 1010 Col. Centro 73800 Teziutlán. Puebla. México." />
             </div>
           </div>
 
