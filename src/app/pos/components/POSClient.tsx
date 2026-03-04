@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react'
 import {
     ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, PackageOpen, Loader2,
-    X, CheckCircle, Search, ChevronRight, Package, Printer, Zap, ShieldCheck, User
+    X, CheckCircle, Search, ChevronRight, Package, Printer, Zap, ShieldCheck, User, Settings, LogOut
 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { useCartStore, CartProduct } from '@/store/cartStore'
-import { createSaleAction } from '@/app/actions/pos'
+import { createSaleAction, getSalesHistoryAction } from '@/app/actions/pos'
 import { generateTicketPDF } from '@/lib/pdf'
 import { motion, AnimatePresence } from 'framer-motion'
-import React from 'react'
+import React, { useRef } from 'react'
 import Logo from '@/components/shared/Logo'
 
 import CashCloseModal from './CashCloseModal'
@@ -31,6 +31,30 @@ export default function POSClient({ products, userId, userName, businessId, acti
 
     // Mobile state
     const [isCartOpen, setIsCartOpen] = useState(false)
+    const [currentTime, setCurrentTime] = useState(new Date())
+    const [view, setView] = useState<'terminal' | 'history'>('terminal')
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [salesHistory, setSalesHistory] = useState<any[]>([])
+    const [fetchingHistory, setFetchingHistory] = useState(false)
+
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        return () => clearInterval(timer)
+    }, [])
+
+    const formatDate = (date: Date) => {
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+        return {
+            day: days[date.getDay()],
+            date: `${date.getDate()} ${months[date.getMonth()]}`,
+            time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+        }
+    }
+
+    const timeData = formatDate(currentTime)
 
     const currentTotal = getTotal()
     const parsedCash = parseFloat(cashReceived) || 0
@@ -75,6 +99,29 @@ export default function POSClient({ products, userId, userName, businessId, acti
             setLoading(false)
         }
     }
+
+    const fetchHistory = async () => {
+        setFetchingHistory(true)
+        const history = await getSalesHistoryAction(businessId)
+        setSalesHistory(history)
+        setFetchingHistory(false)
+    }
+
+    useEffect(() => {
+        if (view === 'history') {
+            fetchHistory()
+        }
+    }, [view])
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsSettingsOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     const finishSale = (printTicket: boolean) => {
         if (printTicket && saleComplete) {
@@ -130,25 +177,27 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="hidden 2xl:flex items-center gap-6 border-r border-white/5 pr-8 mr-4">
+                    <div className="hidden md:flex items-center gap-6 border-r border-white/5 pr-8 mr-4">
                         <div className="flex flex-col text-right">
-                            <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.2em] leading-none mb-1">Operador</span>
-                            <span className="text-xs font-black text-white italic uppercase tracking-tighter">{userName || 'Cajero'}</span>
+                            <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1">Operador de Turno</span>
+                            <span className="text-sm font-black text-white italic uppercase tracking-tighter">{userName || 'Cajero de Turno'}</span>
                         </div>
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
                             <User className="w-5 h-5 text-primary" />
                         </div>
                     </div>
 
-                    <div className="hidden lg:flex items-center gap-2 mr-4 text-surface/30">
-                        <button className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-white/5 text-primary bg-primary/10 border border-primary/20">Catálogo</button>
-                        <button className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-white/5 hover:text-white">Historial</button>
+                    <div className="hidden lg:flex items-center gap-6 border-r border-white/5 pr-8 mr-4">
+                        <div className="flex flex-col text-right">
+                            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] leading-none mb-1">{timeData.day} {timeData.date}</span>
+                            <span className="text-xl font-black text-white tabular-nums tracking-tighter leading-none">{timeData.time}</span>
+                        </div>
                     </div>
 
                     <button
                         onClick={() => setIsCloseModalOpen(true)}
                         className={cn(
-                            "px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 border shadow-lg shadow-black/20",
+                            "px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 border shadow-lg shadow-black/20 mr-2",
                             activeRegister
                                 ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20"
                                 : "text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20"
@@ -163,17 +212,57 @@ export default function POSClient({ products, userId, userName, businessId, acti
                         <span className="opacity-60">CORTE DE CAJA</span>
                     </button>
 
-                    <div className="hidden sm:flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/5">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest">En Línea</span>
+                    <div className="hidden lg:flex items-center gap-2 relative" ref={menuRef}>
+                        <button
+                            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                            className={cn(
+                                "p-3 rounded-xl transition-all border group",
+                                isSettingsOpen
+                                    ? "bg-primary text-secondary border-primary"
+                                    : "bg-white/5 text-white/40 hover:bg-white/10 hover:text-white border-white/5"
+                            )}
+                            title="Operaciones de Terminal"
+                        >
+                            <Settings className={cn("w-5 h-5 transition-transform", isSettingsOpen ? "rotate-90" : "group-hover:rotate-45")} />
+                        </button>
+
+                        <AnimatePresence>
+                            {isSettingsOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                    className="absolute top-full right-0 mt-4 w-60 bg-secondary shadow-2xl border border-white/10 rounded-[2rem] p-3 z-[100] grid gap-2"
+                                >
+                                    <button
+                                        onClick={() => window.location.href = '/pos/catalog'}
+                                        className="flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-white/40 hover:bg-white/5 hover:text-white"
+                                    >
+                                        <Package className="w-4 h-4" /> Catálogo
+                                    </button>
+                                    <button
+                                        onClick={() => { setView('history'); setIsSettingsOpen(false); }}
+                                        className={cn(
+                                            "flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                            view === 'history' ? "bg-primary text-secondary" : "text-white/40 hover:bg-white/5 hover:text-white"
+                                        )}
+                                    >
+                                        <Printer className="w-4 h-4" /> Historial
+                                    </button>
+                                    <div className="h-px bg-white/5 my-1" />
+                                    <button
+                                        onClick={() => window.location.href = '/login'}
+                                        className="flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-red-400 hover:bg-red-500/10"
+                                    >
+                                        <LogOut className="w-4 h-4" /> Cerrar Sesión
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    <button
-                        onClick={() => window.location.href = '/login'}
-                        className="p-3 bg-white/5 hover:bg-red-500/10 hover:text-red-500 rounded-2xl transition-all border border-white/5 group"
-                        title="Cerrar Sesión"
-                    >
-                        <X className="w-5 h-5 group-hover:scale-110" />
-                    </button>
+
+
+
                 </div>
             </nav>
 
@@ -334,127 +423,128 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     )}
                 </AnimatePresence>
 
-                {/* Product Grid Area */}
+                {/* Content Area: Terminal vs History */}
                 <div className={cn(
                     "flex-1 flex flex-col p-6 md:p-8 lg:p-12 overflow-hidden transition-all duration-300 relative z-10",
                     isCartOpen ? "hidden md:flex opacity-0 lg:opacity-100" : "flex"
                 )}>
-                    {/* Header: Search & Categories */}
-                    <header className="mb-12 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <Zap className="w-4 h-4 text-primary animate-pulse" />
-                                <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Terminal de Venta Activa</span>
-                            </div>
-                            <h1 className="text-4xl md:text-5xl font-black text-white italic uppercase tracking-tighter leading-none">
-                                Selección de <span className="text-primary">Productos</span>
-                            </h1>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto">
-                            <div className="relative w-full md:w-80 group">
-                                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-surface/20 group-focus-within:text-primary transition-colors" />
-                                <input
-                                    type="text"
-                                    placeholder="BUSCAR PRODUCTO..."
-                                    className="w-full pl-16 pr-6 py-5 bg-white/5 border border-white/5 rounded-[1.5rem] text-xs font-black tracking-widest text-white focus:bg-white/10 focus:border-primary/30 transition-all outline-none placeholder:text-white/10"
-                                />
-                            </div>
-                            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 scrollbar-none">
-                                <button
-                                    onClick={() => setActiveCategory('Todos')}
-                                    className={cn(
-                                        "px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl whitespace-nowrap",
-                                        activeCategory === 'Todos' ? "bg-primary text-secondary" : "bg-white/5 text-surface/30 hover:bg-white/10 hover:text-white border border-white/5"
-                                    )}
-                                >
-                                    Todos
-                                </button>
-                                {CATEGORIES.map(c => (
-                                    <button
-                                        key={c}
-                                        onClick={() => setActiveCategory(c)}
-                                        className={cn(
-                                            "px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl whitespace-nowrap",
-                                            activeCategory === c ? "bg-primary text-secondary" : "bg-white/5 text-surface/30 hover:bg-white/10 hover:text-white border border-white/5"
-                                        )}
-                                    >
-                                        {c}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* Grid */}
-                    <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 pb-24 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                        {products.map(p => {
-                            const isKg = p.unitType?.toLowerCase().includes('kg') || p.unitType?.toLowerCase() === 'kilogramo';
-                            const remStock = getRemainingStock(p);
-                            const isLowStock = remStock <= p.minimumStockAlert;
-
-                            return (
-                                <div key={p.id} className="group relative bg-secondary/30 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-6 transition-all hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden">
-                                    {/* Decorative Glow */}
-                                    <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-primary/10 transition-colors" />
-
-                                    <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 group-hover:rotate-3 transition-transform">
-                                                <Package className="w-7 h-7" />
-                                            </div>
-                                            <span className={cn(
-                                                "text-[9px] px-3 py-1.5 rounded-full font-black uppercase tracking-widest shadow-lg",
-                                                isLowStock ? 'bg-red-500/20 text-red-400 border border-red-500/10' : 'bg-primary/10 text-primary border border-primary/10'
-                                            )}>
-                                                {remStock} {p.unitType}
-                                            </span>
-                                        </div>
-
-                                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-1 leading-tight group-hover:text-primary transition-colors">
-                                            {p.name}
-                                        </h3>
-                                        <p className="text-[10px] font-bold text-surface/20 uppercase tracking-[0.2em] mb-6">
-                                            Precio Público
-                                        </p>
-
-                                        <div className="mb-8 font-mono">
-                                            <span className="text-4xl font-black text-white tracking-tighter tabular-nums leading-none">
-                                                ${Number(p.pricePublic).toFixed(2)}
-                                            </span>
-                                            <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest ml-2">/ {p.unitType}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="relative z-10 space-y-3">
-                                        {isKg ? (
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleAddToCart(p, 0.5)}
-                                                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 active:scale-95"
-                                                >
-                                                    ½ Kg
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAddToCart(p, 1)}
-                                                    className="flex-1 py-4 bg-primary text-secondary rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all"
-                                                >
-                                                    1 Kg
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button
-                                                onClick={() => handleAddToCart(p, 1)}
-                                                className="w-full py-5 bg-primary text-secondary rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
-                                            >
-                                                <Plus className="w-4 h-4" /> AGREGAR AL TICKET
-                                            </button>
-                                        )}
-                                    </div>
+                    {view === 'terminal' ? (
+                        <div className="flex-1 flex flex-col items-center justify-center relative">
+                            {/* Terminal Ready Visuals */}
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-center relative z-10"
+                            >
+                                <div className="w-32 h-32 bg-primary/10 rounded-[3rem] border border-primary/20 flex items-center justify-center mx-auto mb-8 relative group">
+                                    <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full animate-pulse group-hover:bg-primary/40 transition-colors" />
+                                    <Logo className="h-12 w-auto relative z-10" variant="premium" />
                                 </div>
-                            )
-                        })}
-                    </div>
+                                <p className="text-[12px] font-black text-primary uppercase tracking-[0.6em] mb-4">Terminal Sincronizada</p>
+                                <h1 className="text-6xl font-black text-white italic uppercase tracking-tighter mb-8 leading-none">
+                                    Listo para <br />
+                                    <span className="text-primary italic">Despachar</span>
+                                </h1>
+                                <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+                                    <button
+                                        onClick={() => window.location.href = '/pos/catalog'}
+                                        className="px-10 py-5 bg-primary text-secondary rounded-3xl font-black text-[11px] uppercase tracking-[0.2em] shadow-2xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-4"
+                                    >
+                                        <PackageOpen className="w-4 h-4" /> Abrir Catálogo
+                                    </button>
+                                    <button
+                                        onClick={() => setView('history')}
+                                        className="px-10 py-5 bg-white/5 text-white/40 hover:text-white rounded-3xl font-black text-[11px] uppercase tracking-[0.2em] border border-white/5 hover:bg-white/10 transition-all flex items-center gap-4"
+                                    >
+                                        <Printer className="w-4 h-4" /> Ver Historial
+                                    </button>
+                                </div>
+                            </motion.div>
+
+                            {/* Decorative Background Elements for "Free" feeling */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 blur-[150px] rounded-full pointer-events-none opacity-50" />
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col overflow-hidden">
+                            <div className="mb-8 flex justify-between items-center">
+                                <div>
+                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2 leading-none">Operativa Ejecutiva</p>
+                                    <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Historial de <span className="text-primary">Ventas</span></h2>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => setView('terminal')}
+                                        className="px-6 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl border border-white/5 transition-all text-[10px] font-black uppercase tracking-widest"
+                                    >
+                                        Volver
+                                    </button>
+                                    <button
+                                        onClick={fetchHistory}
+                                        className="p-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl border border-white/5 transition-all flex items-center gap-3 text-[10px] font-black uppercase tracking-widest"
+                                    >
+                                        <Zap className={cn("w-4 h-4", fetchingHistory && "animate-spin")} /> Actualizar
+                                    </button>
+                                </div>
+                            </div>
+                            {/* ... rest of history logic stays the same if I find the items below */}
+
+                            <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                                {fetchingHistory && salesHistory.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center py-40 gap-4 opacity-20">
+                                        <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Sincronizando Terminal...</span>
+                                    </div>
+                                ) : salesHistory.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center py-40 gap-6 opacity-20">
+                                        <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-white flex items-center justify-center">
+                                            <Printer className="w-8 h-8" />
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Sin registros recientes</span>
+                                    </div>
+                                ) : (
+                                    salesHistory.map((sale: any) => (
+                                        <motion.div
+                                            key={sale.id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8 flex flex-col md:flex-row justify-between items-center gap-6 group hover:bg-white/10 transition-all"
+                                        >
+                                            <div className="flex items-center gap-6">
+                                                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
+                                                    <span className="text-sm font-black text-primary tabular-nums">
+                                                        {new Date(sale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-3 mb-1">
+                                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{sale.paymentMethod}</span>
+                                                        <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                                        <span className="text-[10px] font-black text-primary uppercase tracking-widest">Ref: {sale.id.slice(0, 8)}</span>
+                                                    </div>
+                                                    <p className="text-white/60 text-xs font-bold uppercase truncate max-w-[280px]">
+                                                        {sale.saleItems.map((si: any) => `${si.quantity}${si.product.unitType} ${si.product.name}`).join(', ')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                                                <div className="text-right">
+                                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Inversión Final</p>
+                                                    <span className="text-3xl font-black text-white tracking-tighter tabular-nums">{formatCurrency(sale.totalAmount)}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => generateTicketPDF(sale.saleItems, sale.totalAmount)}
+                                                    className="p-5 bg-white/5 hover:bg-primary hover:text-secondary rounded-2xl transition-all border border-white/5"
+                                                    title="Reimprimir Ticket"
+                                                >
+                                                    <Printer className="w-6 h-6" />
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Cart Area */}
@@ -469,10 +559,10 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                 <X className="w-5 h-5" />
                             </button>
                             <div>
-                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-1">Registro Digital</p>
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] mb-1">Registro Digital</p>
                                 <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-3">
                                     <ShoppingCart className="w-6 h-6 text-primary not-italic" />
-                                    Manifiesto de <span className="text-primary">Venta</span>
+                                    Resumen de <span className="text-primary">Venta</span>
                                 </h2>
                             </div>
                         </div>
@@ -480,7 +570,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                             onClick={clearCart}
                             className="p-4 rounded-2xl bg-white/5 text-surface/20 hover:bg-red-500/10 hover:text-red-500 transition-all active:scale-90"
                             disabled={items.length === 0}
-                            title="Anular Manifiesto"
+                            title="Anular Resumen"
                         >
                             <Trash2 className="w-6 h-6" />
                         </button>
@@ -497,7 +587,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                     <div className="flex-1">
                                         <span className="font-black text-white block text-lg italic uppercase tracking-tight mb-1">{item.name}</span>
                                         <div className="flex items-center gap-3">
-                                            <span className="font-bold text-[10px] text-surface/40 uppercase tracking-widest leading-none">
+                                            <span className="font-bold text-[10px] text-white/50 uppercase tracking-widest leading-none">
                                                 {formatCurrency(Number(item.pricePublic))} {item.unitType === 'kg' ? 'X KG' : 'C/U'}
                                             </span>
                                         </div>
@@ -508,7 +598,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                 </div>
 
                                 <div className="relative z-10 flex items-center justify-between">
-                                    <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.3em]">Cantidad Despachada</span>
+                                    <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em]">Cantidad Despachada</span>
                                     <div className="flex items-center gap-3 bg-secondary/80 p-1.5 rounded-2xl border border-white/5">
                                         <button
                                             title="Reducir"
@@ -535,7 +625,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                     <ShoppingCart className="w-10 h-10" />
                                 </div>
                                 <div>
-                                    <p className="font-black uppercase tracking-[0.4em] text-[10px] mb-2">Manifiesto en Blanco</p>
+                                    <p className="font-black uppercase tracking-[0.4em] text-[10px] mb-2">Resumen Vacío</p>
                                     <p className="text-[9px] font-bold uppercase tracking-widest max-w-[150px] mx-auto opacity-50">Esperando carga de productos para procesamiento.</p>
                                 </div>
                             </div>
@@ -546,7 +636,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     <div className="p-8 md:p-10 bg-secondary/60 backdrop-blur-3xl border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
                         <div className="space-y-4 mb-10">
                             <div className="flex justify-between items-center px-4">
-                                <span className="text-[10px] font-black text-surface/30 uppercase tracking-[0.3em]">Carga de Productos</span>
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Carga de Productos</span>
                                 <span className="font-black text-white/60 tabular-nums font-mono">{formatCurrency(Number(currentTotal))}</span>
                             </div>
                             <div className="bg-primary p-8 rounded-[2.5rem] shadow-2xl shadow-primary/20 group overflow-hidden relative">

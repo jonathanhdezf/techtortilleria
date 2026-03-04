@@ -89,9 +89,14 @@ export default function Hero() {
                         <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-transparent opacity-30 pointer-events-none" />
 
                         <div className="p-2 md:p-4 bg-neutral-black/40">
-                            <img
-                                src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=2000&auto=format&fit=crop"
-                                alt="Terminal POS TechTortilleria"
+                            <video
+                                src="/techherovideo.mp4"
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                preload="auto"
+                                poster="/videohero.webp"
                                 className="w-full h-auto object-cover rounded-[32px] opacity-80 brightness-75 contrast-125"
                             />
                         </div>

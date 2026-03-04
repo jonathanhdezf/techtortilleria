@@ -102,3 +102,36 @@ export async function getPOSInitialData() {
         return { businessId: "default-business", userId: "default-user" };
     }
 }
+
+export async function getSalesHistoryAction(businessId: string) {
+    try {
+        const sales = await prisma.sale.findMany({
+            where: { businessId },
+            orderBy: { createdAt: "desc" },
+            take: 50,
+            include: {
+                saleItems: {
+                    include: {
+                        product: {
+                            select: { name: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        return sales.map((sale: any) => ({
+            ...sale,
+            totalAmount: Number(sale.totalAmount),
+            saleItems: sale.saleItems.map((item: any) => ({
+                ...item,
+                unitPrice: Number(item.unitPrice),
+                subtotal: Number(item.subtotal),
+                quantity: Number(item.quantity)
+            }))
+        }));
+    } catch (error) {
+        console.error("Error fetching sales history:", error);
+        return [];
+    }
+}
