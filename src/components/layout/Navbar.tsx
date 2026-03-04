@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ShoppingBag, Menu, X, Terminal } from "lucide-react";
+import { motion } from "framer-motion";
+import { Menu, X, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/shared/Logo";
 
@@ -18,57 +19,90 @@ export default function Navbar() {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
+    const navLinks = [
+        { name: "Historia", href: "#historia" },
+        { name: "Productos", href: "#productos" },
+        { name: "Contacto", href: "#contacto" },
+    ];
+
     return (
         <nav
             className={cn(
-                "fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-6 py-4",
-                isScrolled ? "glass py-3 shadow-md" : "bg-transparent"
+                "fixed top-0 left-0 right-0 z-50 transition-all duration-500 px-6 py-4",
+                isScrolled ? "bg-neutral-black/80 backdrop-blur-2xl py-3 border-b border-white/5 shadow-2xl" : "bg-transparent"
             )}
         >
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <Link href="/" className="flex items-center group">
-                    <Logo className={cn(
-                        "h-16 md:h-20 w-auto transition-all duration-300",
-                        isScrolled ? "text-white" : "text-secondary"
-                    )} />
+                    <Logo className="h-10 md:h-12 w-auto" variant="premium" />
                 </Link>
 
                 {/* Desktop Nav */}
-                <div className="hidden md:flex items-center gap-8">
-                    <Link href="#historia" className="text-sm font-medium hover:text-accent transition-colors">Historia</Link>
-                    <Link href="#productos" className="text-sm font-medium hover:text-accent transition-colors">Productos</Link>
-                    <Link href="#contacto" className="text-sm font-medium hover:text-accent transition-colors">Contacto</Link>
-                    <div className="h-6 w-px bg-secondary/10 mx-2" />
-                    <Link
-                        href="/pos"
-                        className="text-sm font-semibold px-4 py-2 rounded-lg bg-secondary text-surface hover:bg-neutral-black transition-all shadow-md"
-                    >
-                        Terminal POS
-                    </Link>
-                    <Link
-                        href="/distribuidores/login"
-                        className="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-secondary hover:bg-primary-dark transition-all shadow-md"
-                    >
-                        Portal Distribuidores
-                    </Link>
+                <div className="hidden lg:flex items-center gap-10">
+                    <div className="flex items-center gap-8 mr-4">
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.name}
+                                href={link.href}
+                                className="text-[10px] font-black text-white/40 hover:text-primary uppercase tracking-[0.3em] transition-all"
+                            >
+                                {link.name}
+                            </Link>
+                        ))}
+                    </div>
+
+                    <div className="h-6 w-px bg-white/10" />
+
+                    <div className="flex items-center gap-4">
+                        <Link
+                            href="/pos"
+                            className="text-[10px] font-black px-5 py-2.5 rounded-xl bg-white/5 text-white border border-white/10 hover:bg-white/10 transition-all uppercase tracking-widest flex items-center gap-2"
+                        >
+                            <Terminal className="w-3 h-3 text-primary" />
+                            Terminal POS
+                        </Link>
+                        <Link
+                            href="/distribuidores/login"
+                            className="text-[10px] font-black px-5 py-2.5 rounded-xl bg-primary text-black hover:bg-white transition-all shadow-lg shadow-primary/10 uppercase tracking-widest"
+                        >
+                            Distribuidores
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Mobile Toggle */}
-                <button className="md:hidden text-secondary" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-                    {mobileMenuOpen ? <X /> : <Menu />}
+                <button
+                    className="lg:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-white"
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                >
+                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
                 </button>
             </div>
 
             {/* Mobile Menu */}
             {mobileMenuOpen && (
-                <div className="md:hidden absolute top-full left-0 right-0 bg-surface border-t border-secondary/10 p-6 flex flex-col gap-4 shadow-xl">
-                    <Link href="#historia" onClick={() => setMobileMenuOpen(false)}>Historia</Link>
-                    <Link href="#productos" onClick={() => setMobileMenuOpen(false)}>Productos</Link>
-                    <Link href="#contacto" onClick={() => setMobileMenuOpen(false)}>Contacto</Link>
-                    <Link href="/pos" className="w-full text-center py-3 bg-secondary text-surface rounded-lg">Terminal POS</Link>
-                    <Link href="/distribuidores/login" className="w-full text-center py-3 bg-primary text-secondary rounded-lg">Portal Distribuidores</Link>
-                </div>
+                <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="lg:hidden absolute top-full left-0 right-0 bg-neutral-black/95 backdrop-blur-3xl border-b border-white/10 p-8 flex flex-col gap-6 shadow-2xl noise"
+                >
+                    {navLinks.map((link) => (
+                        <Link
+                            key={link.name}
+                            href={link.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="text-xs font-black text-white/60 hover:text-primary uppercase tracking-[0.3em]"
+                        >
+                            {link.name}
+                        </Link>
+                    ))}
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                        <Link href="/pos" className="text-[10px] font-black text-center py-4 bg-white/5 text-white rounded-2xl border border-white/10 uppercase tracking-widest">POS</Link>
+                        <Link href="/distribuidores/login" className="text-[10px] font-black text-center py-4 bg-primary text-black rounded-2xl uppercase tracking-widest">Acceso</Link>
+                    </div>
+                </motion.div>
             )}
         </nav>
     );
 }
+

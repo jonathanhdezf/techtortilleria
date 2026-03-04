@@ -1,21 +1,31 @@
 'use client'
 
-import { useState } from 'react'
-import { ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, PackageOpen, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useState, useEffect } from 'react'
+import {
+    ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, PackageOpen, Loader2,
+    X, CheckCircle, Search, ChevronRight, Package, Printer, Zap, ShieldCheck, User
+} from 'lucide-react'
+import { cn, formatCurrency } from '@/lib/utils'
 import { useCartStore, CartProduct } from '@/store/cartStore'
 import { createSaleAction } from '@/app/actions/pos'
 import { generateTicketPDF } from '@/lib/pdf'
+import { motion, AnimatePresence } from 'framer-motion'
+import React from 'react'
+import Logo from '@/components/shared/Logo'
+
+import CashCloseModal from './CashCloseModal'
 
 const CATEGORIES = ['Kilo', 'Medio Kilo', 'Masa', 'Salsas', 'Bebidas']
 
-export default function POSClient({ products, userId, businessId }: { products: any[], userId: string, businessId: string }) {
+export default function POSClient({ products, userId, userName, businessId, activeRegister }: { products: any[], userId: string, userName?: string | null, businessId: string, activeRegister?: any }) {
     const { items, addItem, removeItem, updateQuantity, clearCart, getTotal } = useCartStore()
     const [paymentMethod, setPaymentMethod] = useState('efectivo')
     const [loading, setLoading] = useState(false)
+    const [activeCategory, setActiveCategory] = useState('Todos')
 
     // Modal state
     const [isCheckoutModalOpen, setCheckoutModalOpen] = useState(false)
+    const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
     const [cashReceived, setCashReceived] = useState<string>('')
     const [saleComplete, setSaleComplete] = useState<{ success: boolean; change: number; saleItems: any[]; total: number } | null>(null)
 
@@ -53,15 +63,12 @@ export default function POSClient({ products, userId, businessId }: { products: 
 
             if (!req.success) throw new Error(req.error)
 
-            // Instead of generating ticket, update state to show Success screen
             setSaleComplete({
                 success: true,
                 change: paymentMethod === 'efectivo' ? change : 0,
                 saleItems: saleItems,
                 total: currentTotal
             })
-
-            // Don't clear cart or close modal yet, wait for user choice.
         } catch (err) {
             alert('Error procesando venta: ' + (err as Error).message)
         } finally {
@@ -77,7 +84,7 @@ export default function POSClient({ products, userId, businessId }: { products: 
         clearCart()
         setSaleComplete(null)
         setCheckoutModalOpen(false)
-        setIsCartOpen(false) // Close cart on mobile after sale
+        setIsCartOpen(false)
         setCashReceived('')
     }
 
@@ -94,7 +101,6 @@ export default function POSClient({ products, userId, businessId }: { products: 
             }
             addItem(cartProduct)
             if (qty !== 1) {
-                // update amount immediately for half kilos
                 useCartStore.getState().updateQuantity(p.id, qty)
             }
         }
@@ -106,288 +112,532 @@ export default function POSClient({ products, userId, businessId }: { products: 
     }
 
     return (
-        <div className="flex-1 flex flex-col lg:flex-row w-full h-full bg-zinc-950 overflow-hidden relative">
-            {/* Modal de Cobro */}
-            {isCheckoutModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
-                        {!saleComplete ? (
-                            <>
-                                <h2 className="text-2xl font-bold text-white mb-6 text-center md:text-left">Procesar Pago</h2>
+        <div className="flex-1 flex flex-col w-full h-full bg-neutral-black overflow-hidden relative noise">
+            {/* Premium POS Navbar */}
+            <nav className="relative z-[60] flex items-center justify-between px-8 py-4 bg-secondary/40 backdrop-blur-2xl border-b border-white/5 shrink-0">
+                <div className="flex items-center gap-8">
+                    <Logo className="h-10 md:h-12 w-auto" variant="premium" />
+                    <div className="hidden md:flex items-center gap-6 border-l border-white/5 pl-8">
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1">Terminal ID</span>
+                            <span className="text-xs font-black text-white italic uppercase tracking-tighter">POS-001-EXEC</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.2em] leading-none mb-1">Ubicación</span>
+                            <span className="text-xs font-black text-white/60 italic uppercase tracking-tighter">Planta Central</span>
+                        </div>
+                    </div>
+                </div>
 
-                                <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 mb-6 font-mono">
-                                    <div className="flex justify-between items-center text-xs text-zinc-400 mb-1">
-                                        <span>TOTAL A PAGAR</span>
-                                        <span className="uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded">{paymentMethod}</span>
-                                    </div>
-                                    <div className="text-3xl font-bold text-emerald-400 text-center md:text-left">${currentTotal.toFixed(2)}</div>
-                                </div>
+                <div className="flex items-center gap-4">
+                    <div className="hidden 2xl:flex items-center gap-6 border-r border-white/5 pr-8 mr-4">
+                        <div className="flex flex-col text-right">
+                            <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.2em] leading-none mb-1">Operador</span>
+                            <span className="text-xs font-black text-white italic uppercase tracking-tighter">{userName || 'Cajero'}</span>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                            <User className="w-5 h-5 text-primary" />
+                        </div>
+                    </div>
 
-                                {paymentMethod === 'efectivo' && (
-                                    <div className="space-y-4 mb-6">
-                                        <div>
-                                            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-2">Efectivo Recibido</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-mono text-xl">$</span>
-                                                <input
-                                                    type="number"
-                                                    inputMode="decimal"
-                                                    value={cashReceived}
-                                                    onChange={(e) => setCashReceived(e.target.value)}
-                                                    className="w-full pl-10 pr-4 py-4 bg-zinc-950 border border-zinc-700 rounded-xl text-white font-mono text-xl focus:border-emerald-500 focus:outline-none transition-colors"
-                                                    placeholder="0.00"
-                                                    autoFocus
-                                                />
+                    <div className="hidden lg:flex items-center gap-2 mr-4 text-surface/30">
+                        <button className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-white/5 text-primary bg-primary/10 border border-primary/20">Catálogo</button>
+                        <button className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-white/5 hover:text-white">Historial</button>
+                    </div>
+
+                    <button
+                        onClick={() => setIsCloseModalOpen(true)}
+                        className={cn(
+                            "px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-3 border shadow-lg shadow-black/20",
+                            activeRegister
+                                ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20"
+                                : "text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20"
+                        )}
+                    >
+                        <div className={cn(
+                            "w-2 h-2 rounded-full animate-pulse",
+                            activeRegister ? "bg-emerald-500" : "bg-red-500"
+                        )} />
+                        <span>Caja 1 - {activeRegister ? 'Abierta' : 'Cerrada'}</span>
+                        <div className="w-px h-4 bg-white/10 mx-1" />
+                        <span className="opacity-60">CORTE DE CAJA</span>
+                    </button>
+
+                    <div className="hidden sm:flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/5">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">En Línea</span>
+                    </div>
+                    <button
+                        onClick={() => window.location.href = '/login'}
+                        className="p-3 bg-white/5 hover:bg-red-500/10 hover:text-red-500 rounded-2xl transition-all border border-white/5 group"
+                        title="Cerrar Sesión"
+                    >
+                        <X className="w-5 h-5 group-hover:scale-110" />
+                    </button>
+                </div>
+            </nav>
+
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+                {/* Background Glows */}
+                <div className="absolute top-0 -left-20 w-[40rem] h-[40rem] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
+                <div className="absolute bottom-0 -right-20 w-[60rem] h-[60rem] bg-accent/5 blur-[150px] rounded-full pointer-events-none" />
+
+                {/* Modal de Cobro - Redesign */}
+                <CashCloseModal
+                    isOpen={isCloseModalOpen}
+                    onClose={() => setIsCloseModalOpen(false)}
+                    registerData={activeRegister}
+                />
+
+                <AnimatePresence>
+                    {isCheckoutModalOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => !saleComplete && setCheckoutModalOpen(false)}
+                                className="absolute inset-0 bg-black/80 backdrop-blur-md"
+                            />
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                                animate={{ scale: 1, opacity: 1, y: 0 }}
+                                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                                className="relative bg-secondary overflow-hidden border border-white/5 rounded-[3.5rem] p-8 md:p-12 max-w-xl w-full shadow-2xl"
+                            >
+                                {/* Modal Background Effect */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full -mr-32 -mt-32 pointer-events-none" />
+
+                                {!saleComplete ? (
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-center mb-10">
+                                            <div>
+                                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2 leading-none">Cierre de Operación</p>
+                                                <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter">Procesar <span className="text-primary">Pago</span></h2>
+                                            </div>
+                                            <button
+                                                onClick={() => setCheckoutModalOpen(false)}
+                                                className="p-4 bg-white/5 rounded-2xl text-surface/20 hover:text-white transition-colors"
+                                                title="Cerrar modal"
+                                                aria-label="Cerrar modal de pago"
+                                            >
+                                                <X className="w-6 h-6" />
+                                            </button>
+                                        </div>
+
+                                        <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/5 mb-8">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em]">Total a Liquidar</span>
+                                                <span className="px-4 py-1.5 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-widest border border-primary/10">
+                                                    {paymentMethod}
+                                                </span>
+                                            </div>
+                                            <div className="text-6xl font-black text-primary tracking-tighter tabular-nums leading-none">
+                                                {formatCurrency(Number(currentTotal))}
                                             </div>
                                         </div>
-                                        <div className={`p-4 rounded-xl border transition-colors ${change >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
-                                            <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Cambio a entregar</div>
-                                            <div className={`text-2xl font-mono font-bold ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                ${change >= 0 ? change.toFixed(2) : '0.00'}
+
+                                        {paymentMethod === 'efectivo' && (
+                                            <div className="space-y-6 mb-10">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-surface/20 uppercase tracking-[0.4em] mb-4 ml-4">Monto Recibido</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-8 top-1/2 -translate-y-1/2 text-primary font-black text-3xl italic">$</span>
+                                                        <input
+                                                            type="number"
+                                                            inputMode="decimal"
+                                                            value={cashReceived}
+                                                            onChange={(e) => setCashReceived(e.target.value)}
+                                                            className="w-full pl-16 pr-8 py-8 bg-white/5 border border-white/10 rounded-[2rem] text-white font-black text-4xl tabular-nums focus:border-primary focus:bg-white/10 transition-all outline-none"
+                                                            placeholder="0.00"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className={cn(
+                                                    "p-8 rounded-[2.5rem] border transition-all flex justify-between items-center overflow-hidden relative",
+                                                    change >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'
+                                                )}>
+                                                    <div>
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-50">Cambio a Devolver</p>
+                                                        <div className={cn(
+                                                            "text-4xl font-black tracking-tighter tabular-nums",
+                                                            change >= 0 ? 'text-emerald-400' : 'text-red-400'
+                                                        )}>
+                                                            {formatCurrency(Math.max(0, change))}
+                                                        </div>
+                                                    </div>
+                                                    <div className={cn(
+                                                        "w-16 h-16 rounded-2xl flex items-center justify-center",
+                                                        change >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                                                    )}>
+                                                        <Zap className="w-8 h-8" />
+                                                    </div>
+                                                </div>
                                             </div>
+                                        )}
+
+                                        <div className="flex gap-4">
+                                            <button
+                                                disabled={loading || (paymentMethod === 'efectivo' && change < 0)}
+                                                onClick={handleCheckout}
+                                                className="flex-1 py-6 bg-primary text-secondary rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-4"
+                                            >
+                                                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+                                                    <>
+                                                        <CheckCircle className="w-6 h-6" />
+                                                        Finalizar Venta
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="relative z-10 text-center py-6">
+                                        <motion.div
+                                            initial={{ scale: 0, rotate: -20 }}
+                                            animate={{ scale: 1, rotate: 0 }}
+                                            className="w-32 h-32 bg-primary/20 text-primary rounded-[3rem] flex items-center justify-center mx-auto mb-10 shadow-3xl shadow-primary/10"
+                                        >
+                                            <CheckCircle className="w-16 h-16" />
+                                        </motion.div>
+
+                                        <p className="text-[12px] font-black text-primary uppercase tracking-[0.5em] mb-4">Operación Finalizada</p>
+                                        <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter mb-4">¡VENTA <span className="text-primary">EXITOSA</span>!</h2>
+
+                                        {paymentMethod === 'efectivo' && (
+                                            <div className="bg-white/5 py-4 px-8 rounded-full border border-white/5 inline-flex items-center gap-4 mb-12">
+                                                <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest">Cambio Entregado:</span>
+                                                <span className="font-black text-2xl text-primary tracking-tighter tabular-nums">{formatCurrency(saleComplete.change)}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-col gap-4 max-w-xs mx-auto">
+                                            <button
+                                                onClick={() => finishSale(true)}
+                                                className="w-full py-6 bg-white/5 hover:bg-white/10 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs border border-white/10 transition-all flex items-center justify-center gap-4 group"
+                                            >
+                                                <Printer className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                Imprimir Comprobante
+                                            </button>
+                                            <button
+                                                onClick={() => finishSale(false)}
+                                                className="w-full py-6 bg-primary text-secondary rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-primary/20 hover:scale-105 transition-all"
+                                            >
+                                                Siguiente Operación
+                                            </button>
                                         </div>
                                     </div>
                                 )}
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
 
-                                <div className="flex flex-col md:flex-row gap-3">
+                {/* Product Grid Area */}
+                <div className={cn(
+                    "flex-1 flex flex-col p-6 md:p-8 lg:p-12 overflow-hidden transition-all duration-300 relative z-10",
+                    isCartOpen ? "hidden md:flex opacity-0 lg:opacity-100" : "flex"
+                )}>
+                    {/* Header: Search & Categories */}
+                    <header className="mb-12 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <Zap className="w-4 h-4 text-primary animate-pulse" />
+                                <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em]">Terminal de Venta Activa</span>
+                            </div>
+                            <h1 className="text-4xl md:text-5xl font-black text-white italic uppercase tracking-tighter leading-none">
+                                Selección de <span className="text-primary">Productos</span>
+                            </h1>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto">
+                            <div className="relative w-full md:w-80 group">
+                                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-surface/20 group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="BUSCAR PRODUCTO..."
+                                    className="w-full pl-16 pr-6 py-5 bg-white/5 border border-white/5 rounded-[1.5rem] text-xs font-black tracking-widest text-white focus:bg-white/10 focus:border-primary/30 transition-all outline-none placeholder:text-white/10"
+                                />
+                            </div>
+                            <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 scrollbar-none">
+                                <button
+                                    onClick={() => setActiveCategory('Todos')}
+                                    className={cn(
+                                        "px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl whitespace-nowrap",
+                                        activeCategory === 'Todos' ? "bg-primary text-secondary" : "bg-white/5 text-surface/30 hover:bg-white/10 hover:text-white border border-white/5"
+                                    )}
+                                >
+                                    Todos
+                                </button>
+                                {CATEGORIES.map(c => (
                                     <button
-                                        onClick={() => setCheckoutModalOpen(false)}
-                                        className="w-full md:flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-bold transition-all"
+                                        key={c}
+                                        onClick={() => setActiveCategory(c)}
+                                        className={cn(
+                                            "px-6 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-xl whitespace-nowrap",
+                                            activeCategory === c ? "bg-primary text-secondary" : "bg-white/5 text-surface/30 hover:bg-white/10 hover:text-white border border-white/5"
+                                        )}
                                     >
-                                        Cancelar
+                                        {c}
                                     </button>
-                                    <button
-                                        disabled={loading || (paymentMethod === 'efectivo' && change < 0)}
-                                        onClick={handleCheckout}
-                                        className="w-full md:flex-1 py-4 bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/10 group"
-                                    >
-                                        {loading ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <Loader2 className="w-4 h-4 animate-spin" /> Procesando
+                                ))}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Grid */}
+                    <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 pb-24 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                        {products.map(p => {
+                            const isKg = p.unitType?.toLowerCase().includes('kg') || p.unitType?.toLowerCase() === 'kilogramo';
+                            const remStock = getRemainingStock(p);
+                            const isLowStock = remStock <= p.minimumStockAlert;
+
+                            return (
+                                <div key={p.id} className="group relative bg-secondary/30 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-6 transition-all hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden">
+                                    {/* Decorative Glow */}
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-primary/10 transition-colors" />
+
+                                    <div className="relative z-10">
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 group-hover:rotate-3 transition-transform">
+                                                <Package className="w-7 h-7" />
+                                            </div>
+                                            <span className={cn(
+                                                "text-[9px] px-3 py-1.5 rounded-full font-black uppercase tracking-widest shadow-lg",
+                                                isLowStock ? 'bg-red-500/20 text-red-400 border border-red-500/10' : 'bg-primary/10 text-primary border border-primary/10'
+                                            )}>
+                                                {remStock} {p.unitType}
                                             </span>
-                                        ) : 'Confirmar'}
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="text-center">
-                                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <ShoppingCart className="w-10 h-10 text-emerald-500" />
-                                </div>
-                                <h2 className="text-2xl font-bold text-white mb-2 italic tracking-tight">¡VENTA EXITOSA!</h2>
+                                        </div>
 
-                                {paymentMethod === 'efectivo' && (
-                                    <p className="text-zinc-400 mb-8 font-medium">
-                                        Cambio entregado: <span className="font-mono font-bold text-emerald-400">${saleComplete.change.toFixed(2)}</span>
-                                    </p>
-                                )}
+                                        <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-1 leading-tight group-hover:text-primary transition-colors">
+                                            {p.name}
+                                        </h3>
+                                        <p className="text-[10px] font-bold text-surface/20 uppercase tracking-[0.2em] mb-6">
+                                            Precio Público
+                                        </p>
 
-                                <div className="flex flex-col gap-3">
-                                    <button
-                                        onClick={() => finishSale(true)}
-                                        className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-xl transition-all border border-zinc-700 shadow-md shadow-black/20"
-                                    >
-                                        Imprimir Ticket
-                                    </button>
-                                    <button
-                                        onClick={() => finishSale(false)}
-                                        className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl transition-all shadow-lg shadow-emerald-500/20 uppercase tracking-widest text-sm"
-                                    >
-                                        Siguiente Cliente (Cerrar)
-                                    </button>
+                                        <div className="mb-8 font-mono">
+                                            <span className="text-4xl font-black text-white tracking-tighter tabular-nums leading-none">
+                                                ${Number(p.pricePublic).toFixed(2)}
+                                            </span>
+                                            <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest ml-2">/ {p.unitType}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="relative z-10 space-y-3">
+                                        {isKg ? (
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleAddToCart(p, 0.5)}
+                                                    className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 active:scale-95"
+                                                >
+                                                    ½ Kg
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAddToCart(p, 1)}
+                                                    className="flex-1 py-4 bg-primary text-secondary rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all"
+                                                >
+                                                    1 Kg
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleAddToCart(p, 1)}
+                                                className="w-full py-5 bg-primary text-secondary rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
+                                            >
+                                                <Plus className="w-4 h-4" /> AGREGAR AL TICKET
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* Cart Area */}
+                <aside className={cn(
+                    "fixed lg:relative inset-0 lg:inset-auto z-40 lg:z-0 lg:w-[480px] bg-secondary/40 backdrop-blur-3xl border-l border-white/5 flex flex-col shrink-0 transition-transform duration-500 ease-out shadow-2xl shadow-black",
+                    isCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+                )}>
+                    {/* Cart Header */}
+                    <div className="p-8 md:p-10 border-b border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setIsCartOpen(false)} className="lg:hidden p-3 bg-white/5 rounded-2xl text-surface/30" title="Cerrar ticket">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <div>
+                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-1">Registro Digital</p>
+                                <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter flex items-center gap-3">
+                                    <ShoppingCart className="w-6 h-6 text-primary not-italic" />
+                                    Manifiesto de <span className="text-primary">Venta</span>
+                                </h2>
+                            </div>
+                        </div>
+                        <button
+                            onClick={clearCart}
+                            className="p-4 rounded-2xl bg-white/5 text-surface/20 hover:bg-red-500/10 hover:text-red-500 transition-all active:scale-90"
+                            disabled={items.length === 0}
+                            title="Anular Manifiesto"
+                        >
+                            <Trash2 className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    {/* Cart Items */}
+                    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                        {items.map(item => (
+                            <div key={item.id} className="relative group bg-white/5 border border-white/5 rounded-[2rem] p-6 transition-all hover:bg-white/10 overflow-hidden">
+                                {/* Glow item */}
+                                <div className="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-full -mr-8 -mt-8 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                                <div className="relative z-10 flex justify-between items-start mb-6">
+                                    <div className="flex-1">
+                                        <span className="font-black text-white block text-lg italic uppercase tracking-tight mb-1">{item.name}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-[10px] text-surface/40 uppercase tracking-widest leading-none">
+                                                {formatCurrency(Number(item.pricePublic))} {item.unitType === 'kg' ? 'X KG' : 'C/U'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="font-black text-xl text-primary tracking-tighter tabular-nums">${item.subtotal.toFixed(2)}</span>
+                                    </div>
+                                </div>
+
+                                <div className="relative z-10 flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.3em]">Cantidad Despachada</span>
+                                    <div className="flex items-center gap-3 bg-secondary/80 p-1.5 rounded-2xl border border-white/5">
+                                        <button
+                                            title="Reducir"
+                                            onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - (item.unitType === 'kg' ? 0.5 : 1)))}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90"
+                                        >
+                                            <Minus className="w-4 h-4" />
+                                        </button>
+                                        <span className="w-10 text-center font-black text-lg text-primary tabular-nums">{item.quantity}</span>
+                                        <button
+                                            title="Aumentar"
+                                            onClick={() => updateQuantity(item.id, item.quantity + (item.unitType === 'kg' ? 0.5 : 1))}
+                                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90"
+                                        >
+                                            <Plus className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        {items.length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center py-20 opacity-20 text-center space-y-6">
+                                <div className="w-24 h-24 rounded-[3rem] border-2 border-dashed border-white/40 flex items-center justify-center rotate-12">
+                                    <ShoppingCart className="w-10 h-10" />
+                                </div>
+                                <div>
+                                    <p className="font-black uppercase tracking-[0.4em] text-[10px] mb-2">Manifiesto en Blanco</p>
+                                    <p className="text-[9px] font-bold uppercase tracking-widest max-w-[150px] mx-auto opacity-50">Esperando carga de productos para procesamiento.</p>
                                 </div>
                             </div>
                         )}
                     </div>
-                </div>
-            )}
 
-            {/* Product Grid Area */}
-            <div className={`flex-1 flex flex-col p-4 md:p-6 overflow-hidden transition-all duration-300 ${isCartOpen ? 'hidden md:flex opacity-0 lg:opacity-100 lg:w-0' : 'flex'}`}>
-                {/* Categories / Search */}
-                <div className="mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                    <button className="px-5 py-2.5 rounded-full bg-emerald-500 text-zinc-950 font-black uppercase text-[10px] tracking-widest whitespace-nowrap shadow-lg shadow-emerald-500/20">
-                        Todos
-                    </button>
-                    {CATEGORIES.map(c => (
-                        <button key={c} className="px-5 py-2.5 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700 font-bold uppercase text-[10px] tracking-widest whitespace-nowrap transition-all">
-                            {c}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Grid */}
-                <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 xxl:grid-cols-5 gap-3 pb-24">
-                    {products.map(p => {
-                        const isKg = p.unitType?.toLowerCase().includes('kg') || p.unitType?.toLowerCase() === 'kilogramo';
-                        const remStock = getRemainingStock(p);
-                        const isLowStock = remStock <= p.minimumStockAlert;
-
-                        return (
-                            <div key={p.id} className="group flex flex-col items-stretch bg-zinc-900 border border-zinc-800 rounded-3xl transition-all relative overflow-hidden active:scale-95 hover:border-emerald-500/30">
-                                <span className={cn(
-                                    "absolute top-3 left-3 text-[9px] font-black uppercase tracking-tighter px-2 py-0.5 rounded-md z-10",
-                                    isLowStock ? 'bg-red-500/20 text-red-500' : 'bg-black/50 text-zinc-500 backdrop-blur-sm'
-                                )}>
-                                    Stock: {remStock} {p.unitType}
-                                </span>
-
-                                <button
-                                    onClick={() => handleAddToCart(p, 1)}
-                                    className="flex-1 flex flex-col items-center justify-center p-3 pt-10 transition-colors"
-                                >
-                                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-3xl flex items-center justify-center border-2 mb-3 md:mb-4 group-hover:scale-110 transition-transform bg-zinc-950 border-zinc-800 group-hover:border-emerald-500/50">
-                                        <PackageOpen className="w-6 h-6 md:w-8 md:h-8 text-zinc-500 group-hover:text-emerald-500 transition-colors" />
-                                    </div>
-                                    <span className="font-bold text-zinc-200 text-sm md:text-base text-center leading-tight mb-1">{p.name}</span>
-                                    <span className="text-emerald-400 font-mono font-black text-xs md:text-sm tracking-tighter">${Number(p.pricePublic).toFixed(2)} / {p.unitType}</span>
-                                </button>
-
-                                {isKg && (
-                                    <div className="p-1 px-3 pb-3 flex gap-2">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleAddToCart(p, 0.5); }}
-                                            className="flex-1 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:text-white hover:bg-zinc-800 py-2 rounded-xl transition-all border border-zinc-800"
-                                        >
-                                            ½ Kg
-                                        </button>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleAddToCart(p, 1); }}
-                                            className="flex-1 text-[10px] font-black uppercase tracking-widest bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl transition-all"
-                                        >
-                                            1 Kg
-                                        </button>
-                                    </div>
-                                )}
+                    {/* Pay Section */}
+                    <div className="p-8 md:p-10 bg-secondary/60 backdrop-blur-3xl border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+                        <div className="space-y-4 mb-10">
+                            <div className="flex justify-between items-center px-4">
+                                <span className="text-[10px] font-black text-surface/30 uppercase tracking-[0.3em]">Carga de Productos</span>
+                                <span className="font-black text-white/60 tabular-nums font-mono">{formatCurrency(Number(currentTotal))}</span>
                             </div>
-                        )
-                    })}
-                </div>
-
-                {/* Mobile Floating Tab Integration Point (Fake space for the button) */}
-                <div className="h-16 md:hidden"></div>
-            </div>
-
-            {/* Cart Area */}
-            <div className={cn(
-                "fixed lg:relative inset-0 lg:inset-auto z-40 lg:z-0 lg:w-[400px] border-l border-zinc-800 bg-zinc-950 lg:bg-zinc-900/50 flex flex-col shrink-0 transition-transform duration-300 ease-in-out",
-                isCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-            )}>
-                <div className="p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900 lg:bg-transparent">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setIsCartOpen(false)} className="lg:hidden p-2 -ml-2 text-zinc-400 hover:text-white" title="Cerrar ticket">
-                            <Plus className="w-6 h-6 rotate-45" />
-                        </button>
-                        <h2 className="font-black text-lg uppercase tracking-tight flex items-center gap-2 text-white italic">
-                            <ShoppingCart className="w-5 h-5 text-emerald-500 not-italic" />
-                            Ticket de Venta
-                        </h2>
-                    </div>
-                    <button onClick={clearCart} className="text-zinc-500 hover:text-red-400 transition-colors p-2 rounded-xl hover:bg-red-500/10 active:scale-90" disabled={items.length === 0} title="Vaciar carrito">
-                        <Trash2 className="w-5 h-5" />
-                    </button>
-                </div>
-
-                {/* Cart Items */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-3">
-                    {items.map(item => (
-                        <div key={item.id} className="bg-zinc-950 border text-white border-zinc-800 rounded-2xl p-3 md:p-4 flex flex-col gap-3 shadow-xl">
-                            <div className="flex justify-between items-start">
-                                <span className="font-bold text-sm md:text-base tracking-tight">{item.name}</span>
-                                <span className="font-mono font-black text-emerald-400 text-base md:text-lg tracking-tighter">${item.subtotal.toFixed(2)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">${Number(item.pricePublic).toFixed(2)} {item.unitType === 'kg' ? 'x Kg' : 'c/u'}</span>
-                                <div className="flex items-center gap-2 md:gap-3 bg-zinc-900 rounded-xl p-1 border border-zinc-800">
-                                    <button
-                                        title="Reducir Cantidad"
-                                        onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - (item.unitType === 'kg' ? 0.5 : 1)))}
-                                        className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 transition-colors"
-                                    >
-                                        <Minus className="w-4 h-4 md:w-5 md:h-5" />
-                                    </button>
-                                    <span className="w-6 md:w-8 text-center font-black font-mono text-sm md:text-base">{item.quantity}</span>
-                                    <button
-                                        title="Incrementar Cantidad"
-                                        onClick={() => updateQuantity(item.id, item.quantity + (item.unitType === 'kg' ? 0.5 : 1))}
-                                        className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-lg hover:bg-zinc-800 text-zinc-400 transition-colors"
-                                    >
-                                        <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                                    </button>
+                            <div className="bg-primary p-8 rounded-[2.5rem] shadow-2xl shadow-primary/20 group overflow-hidden relative">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-3xl rounded-full -mr-16 -mt-16 pointer-events-none" />
+                                <div className="flex justify-between items-center relative z-10">
+                                    <div>
+                                        <p className="text-[10px] font-black text-secondary/40 uppercase tracking-[0.4em] mb-2 leading-none">Total Liquidación</p>
+                                        <span className="text-5xl font-black text-secondary tracking-tighter tabular-nums leading-none">
+                                            {formatCurrency(Number(currentTotal))}
+                                        </span>
+                                    </div>
+                                    <Zap className="w-10 h-10 text-secondary/20" />
                                 </div>
                             </div>
                         </div>
-                    ))}
-                    {items.length === 0 && (
-                        <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 opacity-30 mt-10">
-                            <div className="w-16 h-16 rounded-full border-2 border-dashed border-zinc-700 flex items-center justify-center">
-                                <ShoppingCart className="w-6 h-6" />
+
+                        <div className="grid grid-cols-2 gap-4 mb-8">
+                            <button
+                                onClick={() => setPaymentMethod('efectivo')}
+                                className={cn(
+                                    "flex flex-col items-center justify-center gap-3 py-6 rounded-3xl border transition-all active:scale-95 group",
+                                    paymentMethod === 'efectivo'
+                                        ? "bg-secondary text-primary border-primary/20 shadow-xl shadow-black/40"
+                                        : "bg-white/5 hover:bg-white/10 text-surface/20 hover:text-white border-white/5"
+                                )}
+                            >
+                                <Banknote className={cn("w-6 h-6 transition-transform group-hover:scale-110", paymentMethod === 'efectivo' && "text-primary")} />
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Efectivo</span>
+                            </button>
+                            <button
+                                onClick={() => setPaymentMethod('tarjeta')}
+                                className={cn(
+                                    "flex flex-col items-center justify-center gap-3 py-6 rounded-3xl border transition-all active:scale-95 group",
+                                    paymentMethod === 'tarjeta'
+                                        ? "bg-secondary text-primary border-primary/20 shadow-xl shadow-black/40"
+                                        : "bg-white/5 hover:bg-white/10 text-surface/20 hover:text-white border-white/5"
+                                )}
+                            >
+                                <CreditCard className={cn("w-6 h-6 transition-transform group-hover:scale-110", paymentMethod === 'tarjeta' && "text-primary")} />
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Tarjeta</span>
+                            </button>
+                        </div>
+
+                        <button
+                            disabled={items.length === 0 || loading}
+                            onClick={() => setCheckoutModalOpen(true)}
+                            className="w-full relative bg-primary disabled:bg-white/5 disabled:text-white/10 hover:bg-white text-secondary hover:text-secondary py-6 rounded-[2rem] font-black text-lg shadow-2xl shadow-primary/20 disabled:shadow-none transition-all uppercase tracking-[0.2em] active:scale-95 group overflow-hidden"
+                        >
+                            <div className="relative z-10 flex items-center justify-center gap-4">
+                                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+                                    <>
+                                        <ShieldCheck className="w-6 h-6" />
+                                        <span>CONSOLIDAR VENTA</span>
+                                    </>
+                                )}
                             </div>
-                            <p className="font-black uppercase tracking-[0.2em] text-[10px]">Carrito Vacío</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Pay Section */}
-                <div className="p-4 md:p-6 bg-zinc-900 border-t border-zinc-800 shadow-[0_-20px_40px_rgba(0,0,0,0.5)]">
-                    <div className="space-y-2 mb-6 font-bold">
-                        <div className="flex justify-between text-zinc-500 text-[10px] uppercase tracking-widest">
-                            <span>Subtotal Bruto</span>
-                            <span className="font-mono">${currentTotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-white text-2xl lg:text-3xl font-black italic tracking-tighter">
-                            <span>TOTAL</span>
-                            <span className="font-mono text-emerald-400 not-italic">${currentTotal.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                        <button
-                            onClick={() => setPaymentMethod('efectivo')}
-                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border transition-all ${paymentMethod === 'efectivo' ? 'bg-emerald-500 text-zinc-950 border-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-500 border-zinc-800'}`}
-                        >
-                            <Banknote className="w-5 h-5 mb-0.5" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">Efectivo</span>
-                        </button>
-                        <button
-                            onClick={() => setPaymentMethod('tarjeta')}
-                            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border transition-all ${paymentMethod === 'tarjeta' ? 'bg-blue-500 text-white border-blue-500 shadow-lg shadow-blue-500/20' : 'bg-zinc-950 hover:bg-zinc-900 text-zinc-500 border-zinc-800'}`}
-                        >
-                            <CreditCard className="w-5 h-5 mb-0.5" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">Tarjeta</span>
                         </button>
                     </div>
+                </aside>
 
+                {/* Mobile Footer Toggle - Redesign */}
+                <div className="lg:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-[280px]">
                     <button
-                        disabled={items.length === 0 || loading}
-                        onClick={() => setCheckoutModalOpen(true)}
-                        className="w-full relative bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-500 hover:bg-emerald-400 text-zinc-950 text-base md:text-lg font-black py-4 md:py-5 rounded-2xl shadow-[0_10px_30px_rgba(16,185,129,0.3)] disabled:shadow-none transition-all uppercase tracking-widest active:scale-[0.98]"
+                        onClick={() => setIsCartOpen(!isCartOpen)}
+                        className={cn(
+                            "w-full flex items-center justify-between px-8 py-6 rounded-[2.5rem] font-black uppercase text-[11px] tracking-[0.2em] shadow-3xl transition-all active:scale-95 group relative overflow-hidden",
+                            isCartOpen
+                                ? "bg-white text-secondary ring-[12px] ring-white/10"
+                                : "bg-primary text-secondary ring-[12px] ring-primary/10 shadow-primary/20",
+                            items.length > 0 && !isCartOpen ? "animate-bounce-subtle" : ""
+                        )}
                     >
-                        Pagar ${currentTotal.toFixed(2)}
+                        <div className="flex items-center gap-4 relative z-10">
+                            {isCartOpen ? (
+                                <>
+                                    <Package className="w-5 h-5" />
+                                    <span>Ver Productos</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ShoppingCart className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                                    <span>Ticket ({items.length})</span>
+                                </>
+                            )}
+                        </div>
+                        <div className="relative z-10 font-mono text-lg tracking-tighter">
+                            {isCartOpen ? <ChevronRight className="w-6 h-6 rotate-90" /> : <ChevronRight className="w-6 h-6" />}
+                        </div>
                     </button>
                 </div>
             </div>
-
-            {/* Mobile Footer Toggle */}
-            <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-[200px] flex justify-center">
-                <button
-                    onClick={() => setIsCartOpen(!isCartOpen)}
-                    className={cn(
-                        "flex items-center gap-3 px-6 py-4 rounded-full font-black uppercase text-xs tracking-widest shadow-2xl transition-all active:scale-95 group",
-                        isCartOpen ? "bg-zinc-100 text-zinc-950 ring-4 ring-white/10" : "bg-primary text-secondary ring-4 ring-primary/20",
-                        items.length > 0 && !isCartOpen ? "animate-bounce" : ""
-                    )}
-                >
-                    {isCartOpen ? (
-                        <>Ver Productos</>
-                    ) : (
-                        <>
-                            <ShoppingCart className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                            <span>Carrito ({items.length})</span>
-                        </>
-                    )}
-                </button>
-            </div>
         </div>
-    )
+    );
 }

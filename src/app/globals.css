@@ -64,3 +64,13 @@ body {
   pointer-events: none;
   background-image: url("https://www.transparenttextures.com/patterns/paper-fibers.png");
 }
+
+/* Terminal Scanline effect */
+@keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+}
+
+.animate-scanline {
+    animation: scanline 8s linear infinite;
+}

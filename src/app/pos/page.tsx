@@ -42,10 +42,22 @@ export default async function POSPage() {
         minimumStockAlert: Number(p.minimumStockAlert)
     }))
 
+    const serializedRegister = openRegister ? {
+        ...openRegister,
+        openingAmount: Number(openRegister.openingAmount),
+        closingAmount: openRegister.closingAmount ? Number(openRegister.closingAmount) : null,
+    } : null
+
     return (
         <>
             <CashRegisterModal isOpen={!openRegister} />
-            <POSClient products={serializedProducts} userId={dbUser.id} businessId={dbUser.businessId} />
+            <POSClient 
+                products={serializedProducts} 
+                userId={dbUser.id} 
+                userName={dbUser.name}
+                businessId={dbUser.businessId} 
+                activeRegister={serializedRegister} 
+            />
         </>
     )
 }

@@ -464,6 +464,25 @@ export async function createUserAction(data: {
         const existing = await prisma.user.findUnique({ where: { email: data.email } });
         if (existing) return { success: false, error: "El correo ya está registrado" };
 
+        // 1. Registrar en Supabase Auth
+        const supabase = await createClient();
+        const { error: authError } = await supabase.auth.signUp({
+            email: data.email,
+            password: data.password,
+            options: {
+                data: {
+                    name: data.name,
+                    role: data.role
+                }
+            }
+        });
+
+        if (authError) {
+            console.error("Supabase Auth Error:", authError);
+            return { success: false, error: `Error en Autenticación: ${authError.message}` };
+        }
+
+        // 2. Registrar en Base de Datos Local
         await prisma.user.create({
             data: {
                 businessId: business.id,
@@ -477,6 +496,7 @@ export async function createUserAction(data: {
         revalidatePath("/admin");
         return { success: true };
     } catch (error) {
+        console.error("Create user error:", error);
         return { success: false, error: "Error al crear usuario" };
     }
 }
