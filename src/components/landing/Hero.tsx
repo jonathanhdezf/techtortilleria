@@ -88,7 +88,7 @@ export default function Hero() {
 
                         <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-transparent opacity-30 pointer-events-none" />
 
-                        <div className="p-2 md:p-4 bg-neutral-black/40">
+                        <div className="p-1 sm:p-2 md:p-4 bg-neutral-black/40">
                             <video
                                 src="/techherovideo.mp4"
                                 autoPlay

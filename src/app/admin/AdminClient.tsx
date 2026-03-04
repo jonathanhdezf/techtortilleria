@@ -18,6 +18,7 @@ import { generateTicketPDF } from "@/lib/pdf";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/shared/Logo";
+import { useModalAccessibility } from "@/hooks/useModalAccessibility";
 import {
     getAdminMetricsAction, getInventoryAction, getDistributorOrdersAction,
     updateOrderStatusAction, getSalesAction, getProductsFullAction,
@@ -79,6 +80,12 @@ export default function AdminClient() {
     });
     const [uForm, setUForm] = useState({ name: "", email: "", password: "", role: "CAJERO" });
     const [mForm, setMForm] = useState({ productId: "", movementType: "entrada_produccion", quantity: 0 });
+
+    // Modal accessibility hooks
+    useModalAccessibility(productModal.open, () => setProductModal({ ...productModal, open: false }));
+    useModalAccessibility(userModal.open, () => setUserModal({ ...userModal, open: false }));
+    useModalAccessibility(movementModal, () => setMovementModal(false));
+    useModalAccessibility(saleDetailModal.open, () => setSaleDetailModal({ open: false, data: null }));
 
     const loadData = async () => {
         try {
@@ -1021,7 +1028,7 @@ export default function AdminClient() {
                             </div>
 
                             <div className="p-10 space-y-10 overflow-y-auto">
-                                <div className="grid grid-cols-2 gap-8">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
                                     <div className="col-span-2">
                                         <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Nombre Comercial</label>
                                         <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={pForm.name} onChange={e => setPForm({ ...pForm, name: e.target.value })} placeholder="EJ: TORTILLA CLÁSICA" title="Nombre" />
@@ -1088,7 +1095,7 @@ export default function AdminClient() {
                             </div>
 
                             <div className="p-10 space-y-10 overflow-y-auto">
-                                <div className="grid grid-cols-2 gap-8">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                                     <div className="col-span-2">
                                         <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Nombre Completo</label>
                                         <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={uForm.name} onChange={e => setUForm({ ...uForm, name: e.target.value })} placeholder="EJ: DIANA PRINCE" title="Nombre" />

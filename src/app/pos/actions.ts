@@ -101,3 +101,28 @@ export async function processSale(items: { productId: string, quantity: number, 
     revalidatePath('/pos')
     return { success: true }
 }
+
+export async function createExpenseAction(amount: number, description: string) {
+    const user = await getCurrentUser()
+
+    const openRegister = await prisma.cashRegister.findFirst({
+        where: {
+            openedById: user.id,
+            closedAt: null
+        }
+    })
+
+    if (!openRegister) throw new Error('No hay una caja abierta para este usuario')
+
+    await prisma.expense.create({
+        data: {
+            businessId: user.businessId,
+            cashRegisterId: openRegister.id,
+            amount,
+            description
+        }
+    })
+
+    revalidatePath('/pos')
+    return { success: true }
+}

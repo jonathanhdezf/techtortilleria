@@ -42,6 +42,31 @@ export default async function POSPage() {
         minimumStockAlert: Number(p.minimumStockAlert)
     }))
 
+    // Fetch shift summary if register is open
+    let shiftSummary: { cashSales: number, cardSales: number, totalExpenses: number, expensesList: any[] } = { cashSales: 0, cardSales: 0, totalExpenses: 0, expensesList: [] }
+    if (openRegister) {
+        const sales = await prisma.sale.findMany({
+            where: {
+                userId: dbUser.id,
+                createdAt: { gte: openRegister.openedAt }
+            }
+        })
+
+        const expenses = await prisma.expense.findMany({
+            where: {
+                cashRegisterId: openRegister.id
+            },
+            orderBy: { createdAt: 'desc' }
+        })
+
+        shiftSummary = {
+            cashSales: sales.filter(s => s.paymentMethod === 'efectivo').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0),
+            cardSales: sales.filter(s => s.paymentMethod !== 'efectivo').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0),
+            totalExpenses: expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0),
+            expensesList: expenses.map((e: any) => ({ ...e, amount: Number(e.amount) }))
+        }
+    }
+
     const serializedRegister = openRegister ? {
         ...openRegister,
         openingAmount: Number(openRegister.openingAmount),
@@ -51,12 +76,13 @@ export default async function POSPage() {
     return (
         <>
             <CashRegisterModal isOpen={!openRegister} />
-            <POSClient 
-                products={serializedProducts} 
-                userId={dbUser.id} 
+            <POSClient
+                products={serializedProducts}
+                userId={dbUser.id}
                 userName={dbUser.name}
-                businessId={dbUser.businessId} 
-                activeRegister={serializedRegister} 
+                businessId={dbUser.businessId}
+                activeRegister={serializedRegister}
+                shiftSummary={shiftSummary}
             />
         </>
     )

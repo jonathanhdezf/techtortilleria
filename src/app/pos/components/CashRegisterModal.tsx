@@ -7,9 +7,20 @@ import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import Logo from '@/components/shared/Logo'
 
+import { useModalAccessibility } from '@/hooks/useModalAccessibility'
+
 export default function CashRegisterModal({ isOpen }: { isOpen: boolean }) {
     const [amount, setAmount] = useState('')
     const [loading, setLoading] = useState(false)
+
+    // For mandatory modals, we don't handle ESC/Back unless there's a specific exit path.
+    // However, the user asked for ESC/Back for ALL modals.
+    // If we want to be safe, we could make ESC/Back trigger the Logout.
+    useModalAccessibility(isOpen, () => {
+        // Since this modal is mandatory to use the POS, "closing" it should probably mean
+        // going back or logging out. But for now, let's keep it simple as requested.
+        // If onClose is not provided, we won't close it to prevent a broken state.
+    })
 
     if (!isOpen) return null
 
@@ -100,6 +111,18 @@ export default function CashRegisterModal({ isOpen }: { isOpen: boolean }) {
                                 </div>
                             </button>
                         </form>
+
+                        <div className="mt-8 flex justify-center">
+                            <button
+                                onClick={async () => {
+                                    const { logoutAction } = await import('@/app/actions/auth');
+                                    await logoutAction();
+                                }}
+                                className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] hover:text-red-400 transition-colors py-2 px-4 rounded-xl hover:bg-red-500/5 mt-4"
+                            >
+                                Cerrar Sesión
+                            </button>
+                        </div>
 
                         <div className="mt-12 pt-8 border-t border-white/5">
                             <Logo className="h-6 w-auto mx-auto opacity-20 grayscale" variant="premium" />

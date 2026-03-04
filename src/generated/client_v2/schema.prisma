@@ -1,0 +1,236 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client_v2"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Business {
+  id        String   @id @default(uuid())
+  name      String
+  logoUrl   String?
+  phone     String?
+  email     String?
+  address   String?
+  createdAt DateTime @default(now())
+
+  users              User[]
+  products           Product[]
+  sales              Sale[]
+  distributors       Distributor[]
+  distributorOrders  DistributorOrder[]
+  inventoryMovements InventoryMovement[]
+  cashRegisters      CashRegister[]
+  expenses           Expense[]
+  dailyMetrics       DailyMetric[]
+
+  @@map("businesses")
+}
+
+enum Role {
+  ADMIN
+  CAJERO
+  DISTRIBUIDOR
+}
+
+model User {
+  id           String   @id @default(uuid())
+  businessId   String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(CAJERO)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  business   Business       @relation(fields: [businessId], references: [id])
+  sales      Sale[]
+  openedCash CashRegister[] @relation("OpenedBy")
+  closedCash CashRegister[] @relation("ClosedBy")
+
+  @@map("users")
+}
+
+model Product {
+  id                String   @id @default(uuid())
+  businessId        String
+  name              String
+  description       String?
+  pricePublic       Decimal  @db.Decimal(10, 2)
+  priceDistributor  Decimal  @db.Decimal(10, 2)
+  unitType          String // "kg" | "pieza"
+  stockQuantity     Decimal  @db.Decimal(10, 2)
+  minimumStockAlert Decimal  @db.Decimal(10, 2)
+  active            Boolean  @default(true)
+  category          String?
+  createdAt         DateTime @default(now())
+
+  business           Business               @relation(fields: [businessId], references: [id])
+  saleItems          SaleItem[]
+  orderItems         DistributorOrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([businessId])
+  @@map("products")
+}
+
+model Sale {
+  id            String   @id @default(uuid())
+  businessId    String
+  userId        String
+  totalAmount   Decimal  @db.Decimal(10, 2)
+  paymentMethod String // "efectivo" | "transferencia" | "tarjeta"
+  createdAt     DateTime @default(now())
+
+  business  Business   @relation(fields: [businessId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  saleItems SaleItem[]
+
+  @@index([businessId])
+  @@index([createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+  saleId    String
+  productId String
+  quantity  Decimal @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}
+
+model Distributor {
+  id          String   @id @default(uuid())
+  businessId  String
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  creditLimit Decimal  @default(0) @db.Decimal(10, 2)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  business Business           @relation(fields: [businessId], references: [id])
+  orders   DistributorOrder[]
+
+  @@map("distributors")
+}
+
+enum OrderStatus {
+  PENDIENTE
+  APROBADO
+  EN_PREPARACION
+  EN_RUTA
+  ENTREGADO
+  CANCELADO
+}
+
+model DistributorOrder {
+  id            String      @id @default(uuid())
+  businessId    String
+  distributorId String
+  status        OrderStatus @default(PENDIENTE)
+  isPaid        Boolean     @default(false)
+  paymentMethod String? // "efectivo" | "transferencia" | "crédito"
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  createdAt     DateTime    @default(now())
+  deliveredAt   DateTime?
+
+  business    Business               @relation(fields: [businessId], references: [id])
+  distributor Distributor            @relation(fields: [distributorId], references: [id])
+  orderItems  DistributorOrderItem[]
+
+  @@index([status])
+  @@map("distributor_orders")
+}
+
+model DistributorOrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Decimal @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+
+  order   DistributorOrder @relation(fields: [orderId], references: [id])
+  product Product          @relation(fields: [productId], references: [id])
+
+  @@map("distributor_order_items")
+}
+
+model InventoryMovement {
+  id           String   @id @default(uuid())
+  businessId   String
+  productId    String
+  movementType String // "venta" | "distribuidor" | "ajuste" | "merma" | "entrada_produccion"
+  quantity     Decimal  @db.Decimal(10, 2)
+  referenceId  String?
+  createdAt    DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@map("inventory_movements")
+}
+
+model CashRegister {
+  id            String    @id @default(uuid())
+  businessId    String
+  openedById    String
+  closedById    String?
+  openingAmount Decimal   @db.Decimal(10, 2)
+  closingAmount Decimal?  @db.Decimal(10, 2)
+  openedAt      DateTime  @default(now())
+  closedAt      DateTime?
+
+  business Business  @relation(fields: [businessId], references: [id])
+  openedBy User      @relation("OpenedBy", fields: [openedById], references: [id])
+  closedBy User?     @relation("ClosedBy", fields: [closedById], references: [id])
+  expenses Expense[]
+
+  @@map("cash_registers")
+}
+
+model Expense {
+  id             String   @id @default(uuid())
+  businessId     String
+  cashRegisterId String
+  amount         Decimal  @db.Decimal(10, 2)
+  description    String
+  createdAt      DateTime @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id])
+  cashRegister CashRegister @relation(fields: [cashRegisterId], references: [id])
+
+  @@map("expenses")
+}
+
+model DailyMetric {
+  id          String   @id @default(uuid())
+  businessId  String
+  date        DateTime
+  totalSales  Decimal  @db.Decimal(10, 2)
+  totalOrders Int
+  totalIncome Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, date])
+  @@map("daily_metrics")
+}

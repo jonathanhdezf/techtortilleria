@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/client_v2"
 }
 
 datasource db {
@@ -27,6 +28,7 @@ model Business {
   distributorOrders  DistributorOrder[]
   inventoryMovements InventoryMovement[]
   cashRegisters      CashRegister[]
+  expenses           Expense[]
   dailyMetrics       DailyMetric[]
 
   @@map("businesses")
@@ -199,8 +201,23 @@ model CashRegister {
   business Business @relation(fields: [businessId], references: [id])
   openedBy User     @relation("OpenedBy", fields: [openedById], references: [id])
   closedBy User?    @relation("ClosedBy", fields: [closedById], references: [id])
+  expenses Expense[]
 
   @@map("cash_registers")
+}
+
+model Expense {
+  id             String   @id @default(uuid())
+  businessId     String
+  cashRegisterId String
+  amount         Decimal  @db.Decimal(10, 2)
+  description    String
+  createdAt      DateTime @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id])
+  cashRegister CashRegister @relation(fields: [cashRegisterId], references: [id])
+
+  @@map("expenses")
 }
 
 model DailyMetric {

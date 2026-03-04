@@ -8,6 +8,7 @@ import { getDistributorProductsAction, createDistributorOrderAction, getDistribu
 import { logoutAction } from "@/app/actions/auth";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/shared/Logo";
+import { useModalAccessibility } from "@/hooks/useModalAccessibility";
 
 interface UIProduct {
     id: string;
@@ -35,6 +36,8 @@ export default function DistributorClient() {
     const [activeTab, setActiveTab] = useState("ordenar");
     const [success, setSuccess] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    useModalAccessibility(isMobileMenuOpen, () => setIsMobileMenuOpen(false));
 
     const loadData = async () => {
         try {
