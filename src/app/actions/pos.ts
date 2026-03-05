@@ -113,7 +113,7 @@ export async function getSalesHistoryAction(businessId: string) {
                 saleItems: {
                     include: {
                         product: {
-                            select: { name: true }
+                            select: { name: true, unitType: true }
                         }
                     }
                 }

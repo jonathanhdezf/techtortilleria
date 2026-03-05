@@ -816,7 +816,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                                         <span className="text-[10px] font-black text-primary uppercase tracking-widest">Ref: {sale.id.slice(0, 8)}</span>
                                                     </div>
                                                     <p className="text-white/60 text-xs font-bold uppercase truncate max-w-[280px]">
-                                                        {sale.saleItems.map((si: any) => `${si.quantity}${si.product.unitType} ${si.product.name}`).join(', ')}
+                                                        {sale.saleItems.map((si: any) => `${si.quantity} ${si.product.unitType?.toUpperCase() || ''} ${si.product.name}`).join(', ')}
                                                     </p>
                                                 </div>
                                             </div>
