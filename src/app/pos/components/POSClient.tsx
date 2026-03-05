@@ -616,16 +616,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 )}>
                     {view === 'catalog' ? (
                         <div className="flex-1 flex flex-col overflow-hidden">
-                            <div className="mb-8 flex justify-between items-center">
-                                <div>
-                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2 leading-none">Inventario</p>
-                                    <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Catálogo</h2>
-                                </div>
-                                <div className="hidden md:flex items-center gap-3 px-6 py-3 bg-white/5 rounded-2xl border border-white/5">
-                                    <PackageOpen className="w-4 h-4 text-primary" />
-                                    <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{products.length} Items Disponibles</span>
-                                </div>
-                            </div>
+                            {/* Simplified Header - Removed redundant text and count */}
 
                             {/* Optimized Search & Categories for Laptop/Desktop */}
                             <div className="mb-8 flex flex-col md:flex-row items-center gap-6 bg-white/[0.02] p-4 rounded-3xl border border-white/[0.05]">
