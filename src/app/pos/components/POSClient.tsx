@@ -13,6 +13,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import React, { useRef } from 'react'
 import Logo from '@/components/shared/Logo'
 
+import CashCloseModal from './CashCloseModal'
+import AmountSaleModal from './AmountSaleModal'
 import ExpenseModal from './ExpenseModal'
 import CalendarModal from './CalendarModal'
 
