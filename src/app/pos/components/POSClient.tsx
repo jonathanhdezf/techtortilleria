@@ -671,8 +671,8 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                 </div>
                             </div>
 
-                            {/* Grid */}
-                            <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6 pb-24 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                            {/* Grid - Optimized for Laptop (md/lg/xl) */}
+                            <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6 pb-24 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                 {filteredProducts.map(p => {
                                     const isKg = p.unitType?.toLowerCase().includes('kg') || p.unitType?.toLowerCase() === 'kilogramo';
                                     const remStock = getRemainingStock(p);
@@ -680,11 +680,10 @@ export default function POSClient({ products, userId, userName, businessId, acti
 
                                     return (
                                         <motion.div
-                                            layout
                                             initial={{ opacity: 0, scale: 0.9 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             key={p.id}
-                                            className="group relative bg-secondary/30 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-5 md:p-7 transition-all hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden"
+                                            className="group relative bg-secondary/30 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-5 md:p-7 hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden min-h-[320px]"
                                         >
                                             {/* Decorative Glow */}
                                             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-primary/10 transition-colors" />
