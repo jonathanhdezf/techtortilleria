@@ -26,20 +26,25 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
     const handleClose = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setLoading(true)
+        let success = false
         try {
             const formData = new FormData()
             formData.append('closingAmount', amount || '0')
             await closeRegister(formData)
-
-            // Logout after closing the register to allow a different user to log in
-            const { logoutAction } = await import('@/app/actions/auth')
-            await logoutAction()
+            success = true
         } catch (error) {
             console.error('Error closing register:', error)
             alert('Error al cerrar la caja')
         } finally {
             setLoading(false)
+        }
+
+        if (success) {
+            // Logout after closing the register to allow a different user to log in
+            // Move outside try-catch because redirect() throws an internal exception
+            const { logoutAction } = await import('@/app/actions/auth')
             onClose()
+            await logoutAction()
         }
     }
 
