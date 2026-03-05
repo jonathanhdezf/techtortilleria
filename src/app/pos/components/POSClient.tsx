@@ -618,8 +618,8 @@ export default function POSClient({ products, userId, userName, businessId, acti
                         <div className="flex-1 flex flex-col overflow-hidden">
                             <div className="mb-8 flex justify-between items-center">
                                 <div>
-                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2 leading-none">Inventario Activo</p>
-                                    <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Catálogo de <span className="text-primary">Productos</span></h2>
+                                    <p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2 leading-none">Inventario</p>
+                                    <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Catálogo</h2>
                                 </div>
                                 <div className="hidden md:flex items-center gap-3 px-6 py-3 bg-white/5 rounded-2xl border border-white/5">
                                     <PackageOpen className="w-4 h-4 text-primary" />
