@@ -15,6 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TechTortilleria",
   description: "Sistema de Punto de Venta y Administración",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
