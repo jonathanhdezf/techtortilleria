@@ -13,9 +13,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import React, { useRef } from 'react'
 import Logo from '@/components/shared/Logo'
 
-import CashCloseModal from './CashCloseModal'
-import AmountSaleModal from './AmountSaleModal'
 import ExpenseModal from './ExpenseModal'
+import CalendarModal from './CalendarModal'
 
 import { useModalAccessibility } from "@/hooks/useModalAccessibility";
 
@@ -35,6 +34,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
     const [isAmountModalOpen, setIsAmountModalOpen] = useState(false)
     const [selectedProductForAmount, setSelectedProductForAmount] = useState<any>(null)
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false)
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
     // Mobile state
     const [isCartOpen, setIsCartOpen] = useState(false)
@@ -57,6 +57,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
     useModalAccessibility(isAmountModalOpen, () => setIsAmountModalOpen(false))
     useModalAccessibility(isExpenseModalOpen, () => setIsExpenseModalOpen(false))
     useModalAccessibility(isCloseModalOpen, () => setIsCloseModalOpen(false))
+    useModalAccessibility(isCalendarOpen, () => setIsCalendarOpen(false))
 
     const filteredProducts = products.filter(p => {
         const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory
@@ -356,10 +357,14 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     </div>
 
                     <div className="hidden lg:flex items-center gap-6 border-r border-white/5 pr-8 mr-4">
-                        <div className="flex flex-col text-right">
-                            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] leading-none mb-1">{timeData.day} {timeData.date}</span>
+                        <button
+                            onClick={() => setIsCalendarOpen(true)}
+                            className="flex flex-col text-right hover:opacity-70 transition-opacity"
+                            title="Ver Calendario"
+                        >
+                            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">{timeData.day} {timeData.date}</span>
                             <span className="text-xl font-black text-white tabular-nums tracking-tighter leading-none">{timeData.time}</span>
-                        </div>
+                        </button>
                     </div>
 
                     <button
@@ -461,6 +466,11 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 <ExpenseModal
                     isOpen={isExpenseModalOpen}
                     onClose={() => setIsExpenseModalOpen(false)}
+                />
+
+                <CalendarModal
+                    isOpen={isCalendarOpen}
+                    onClose={() => setIsCalendarOpen(false)}
                 />
 
                 <AnimatePresence>
