@@ -45,16 +45,16 @@ export async function closeRegister(formData: FormData) {
 
     if (!openRegister) throw new Error('No open register found')
 
-    await prisma.cashRegister.update({
-        where: { id: openRegister.id },
-        data: {
-            closedAt: new Date(),
-            closedById: user.id,
-            closingAmount,
-            expectedAmount,
-            discrepancyAmount
-        }
-    })
+    await prisma.$executeRaw`
+        UPDATE cash_registers 
+        SET 
+            "closedAt" = ${new Date()},
+            "closingAmount" = ${closingAmount},
+            "expectedAmount" = ${expectedAmount},
+            "discrepancyAmount" = ${discrepancyAmount},
+            "closedById" = ${user.id}
+        WHERE id = ${openRegister.id}
+    `
 
     revalidatePath('/pos')
 }
@@ -133,14 +133,13 @@ export async function createExpenseAction(amount: number, description: string) {
 
 export async function getBusinessSettings() {
     const user = await getCurrentUser()
-    const business = await prisma.business.findUnique({
-        where: { id: user.businessId },
-        select: {
-            volumeDiscountActive: true,
-            volumeDiscountThreshold: true,
-            volumeDiscountPercentage: true
-        }
-    })
+    const results = await prisma.$queryRaw<any[]>`
+        SELECT "volumeDiscountActive", "volumeDiscountThreshold", "volumeDiscountPercentage"
+        FROM businesses
+        WHERE id = ${user.businessId}
+        LIMIT 1
+    `
+    const business = results[0]
 
     return {
         ...business,
