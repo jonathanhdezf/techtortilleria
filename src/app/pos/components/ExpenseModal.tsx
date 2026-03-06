@@ -60,7 +60,7 @@ export default function ExpenseModal({ isOpen, onClose }: ExpenseModalProps) {
                     initial={{ scale: 0.9, opacity: 0, y: 20 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                    className="relative bg-secondary/80 border border-white/5 rounded-[3.5rem] p-8 md:p-14 max-w-xl w-full shadow-3xl backdrop-blur-3xl overflow-hidden"
+                    className="relative bg-secondary/80 border border-white/5 rounded-[3.5rem] p-8 md:p-14 max-w-xl w-full shadow-3xl backdrop-blur-3xl overflow-y-auto max-h-[90vh] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
                 >
                     <div className="absolute top-0 left-0 w-64 h-64 bg-red-500/10 blur-[100px] rounded-full -ml-32 -mt-32 pointer-events-none" />
 
