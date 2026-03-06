@@ -52,7 +52,20 @@ export const useCartStore = create<CartState>((set, get) => ({
         }))
     },
     clearCart: () => set({ items: [] }),
-    getTotal: () => {
-        return get().items.reduce((total, item) => total + item.subtotal, 0)
+    getTotal: (discountSettings?: { active: boolean, threshold: number, percentage: number }) => {
+        const total = get().items.reduce((total, item) => total + item.subtotal, 0)
+
+        if (discountSettings?.active) {
+            // Apply discount if total quantity of KG items exceeds threshold
+            const kgQuantity = get().items
+                .filter(item => item.unitType?.toLowerCase().includes('kg'))
+                .reduce((q, item) => q + item.quantity, 0)
+
+            if (kgQuantity >= discountSettings.threshold) {
+                return total * (1 - (discountSettings.percentage / 100))
+            }
+        }
+
+        return total
     }
 }))

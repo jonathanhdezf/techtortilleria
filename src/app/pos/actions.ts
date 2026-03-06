@@ -33,6 +33,8 @@ export async function openRegister(formData: FormData) {
 export async function closeRegister(formData: FormData) {
     const user = await getCurrentUser()
     const closingAmount = Number(formData.get('closingAmount'))
+    const expectedAmount = Number(formData.get('expectedAmount'))
+    const discrepancyAmount = Number(formData.get('discrepancyAmount'))
 
     const openRegister = await prisma.cashRegister.findFirst({
         where: {
@@ -48,7 +50,9 @@ export async function closeRegister(formData: FormData) {
         data: {
             closedAt: new Date(),
             closedById: user.id,
-            closingAmount
+            closingAmount,
+            expectedAmount,
+            discrepancyAmount
         }
     })
 
@@ -125,4 +129,22 @@ export async function createExpenseAction(amount: number, description: string) {
 
     revalidatePath('/pos')
     return { success: true }
+}
+
+export async function getBusinessSettings() {
+    const user = await getCurrentUser()
+    const business = await prisma.business.findUnique({
+        where: { id: user.businessId },
+        select: {
+            volumeDiscountActive: true,
+            volumeDiscountThreshold: true,
+            volumeDiscountPercentage: true
+        }
+    })
+
+    return {
+        ...business,
+        volumeDiscountThreshold: Number(business?.volumeDiscountThreshold || 5),
+        volumeDiscountPercentage: Number(business?.volumeDiscountPercentage || 5)
+    }
 }

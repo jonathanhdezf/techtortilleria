@@ -30,6 +30,11 @@ model Business {
   expenses           Expense[]
   dailyMetrics       DailyMetric[]
 
+  // Nuevas configuraciones
+  volumeDiscountActive    Boolean @default(false)
+  volumeDiscountThreshold Decimal @default(5.0) @db.Decimal(10, 2)
+  volumeDiscountPercentage Decimal @default(5.0) @db.Decimal(10, 2)
+
   @@map("businesses")
 }
 
@@ -194,6 +199,8 @@ model CashRegister {
   closedById    String?
   openingAmount Decimal   @db.Decimal(10, 2)
   closingAmount Decimal?  @db.Decimal(10, 2)
+  expectedAmount Decimal? @db.Decimal(10, 2)
+  discrepancyAmount Decimal? @db.Decimal(10, 2)
   openedAt      DateTime  @default(now())
   closedAt      DateTime?
 

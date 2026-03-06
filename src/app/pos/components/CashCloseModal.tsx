@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Store, Banknote, X, Zap, PieChart, TrendingUp, DollarSign } from 'lucide-react'
+import { Store, Banknote, X, Zap, PieChart, TrendingUp, DollarSign, CheckCircle, AlertCircle } from 'lucide-react'
 import { closeRegister } from '../actions'
 import { cn, formatCurrency } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -30,6 +30,8 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
         try {
             const formData = new FormData()
             formData.append('closingAmount', amount || '0')
+            formData.append('expectedAmount', expectedTotal.toString())
+            formData.append('discrepancyAmount', discrepancy.toString())
             await closeRegister(formData)
             success = true
         } catch (error) {
@@ -47,6 +49,13 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
             await logoutAction()
         }
     }
+
+    const expectedTotal = (registerData?.openingAmount || 0) +
+        (registerData?.cashSales || 0) -
+        (registerData?.totalExpenses || 0)
+
+    const parsedClosing = parseFloat(amount) || 0
+    const discrepancy = parsedClosing - expectedTotal
 
     return (
         <AnimatePresence>
@@ -146,6 +155,39 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
                                             />
                                         </div>
                                     </div>
+
+                                    {amount && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={cn(
+                                                "p-6 rounded-3xl border transition-all flex justify-between items-center",
+                                                discrepancy === 0 ? "bg-emerald-500/10 border-emerald-500/20" :
+                                                    discrepancy > 0 ? "bg-primary/10 border-primary/20" : "bg-red-500/10 border-red-500/20"
+                                            )}
+                                        >
+                                            <div>
+                                                <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-40">
+                                                    {discrepancy === 0 ? "Balance Cuadrado" :
+                                                        discrepancy > 0 ? "Sobrante Detectado" : "Faltante Detectado"}
+                                                </p>
+                                                <span className={cn(
+                                                    "text-2xl font-black tabular-nums tracking-tighter",
+                                                    discrepancy === 0 ? "text-emerald-400" :
+                                                        discrepancy > 0 ? "text-primary" : "text-red-400"
+                                                )}>
+                                                    {formatCurrency(discrepancy)}
+                                                </span>
+                                            </div>
+                                            <div className={cn(
+                                                "w-12 h-12 rounded-xl flex items-center justify-center",
+                                                discrepancy === 0 ? "bg-emerald-500/20 text-emerald-400" :
+                                                    discrepancy > 0 ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-400"
+                                            )}>
+                                                {discrepancy === 0 ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+                                            </div>
+                                        </motion.div>
+                                    )}
 
                                     <button
                                         type="submit"

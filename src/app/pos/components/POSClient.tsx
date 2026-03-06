@@ -46,6 +46,8 @@ export default function POSClient({ products, userId, userName, businessId, acti
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [salesHistory, setSalesHistory] = useState<any[]>([])
     const [fetchingHistory, setFetchingHistory] = useState(false)
+    const [offlineQueue, setOfflineQueue] = useState<any[]>([])
+    const [isOnline, setIsOnline] = useState(true)
 
     const menuRef = useRef<HTMLDivElement>(null)
     const userMenuRef = useRef<HTMLDivElement>(null)
@@ -143,14 +145,51 @@ export default function POSClient({ products, userId, userName, businessId, acti
             }
         }
 
-        document.addEventListener("mousedown", handleClickOutside)
-        document.addEventListener("keydown", handleKeyDown)
+        const handleOnline = () => setIsOnline(true)
+        const handleOffline = () => setIsOnline(false)
+
+        window.addEventListener('online', handleOnline)
+        window.addEventListener('offline', handleOffline)
+        setIsOnline(navigator.onLine)
+
+        // Load offline queue from localStorage
+        const savedQueue = localStorage.getItem(`offline_sales_${businessId}`)
+        if (savedQueue) {
+            setOfflineQueue(JSON.parse(savedQueue))
+        }
+
         return () => {
             clearInterval(timer)
             document.removeEventListener("mousedown", handleClickOutside)
             document.removeEventListener("keydown", handleKeyDown)
+            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('offline', handleOffline)
         }
-    }, [items, loading, isCheckoutModalOpen, selectedItemId])
+    }, [items, loading, isCheckoutModalOpen, selectedItemId, businessId])
+
+    // Background Sync Logic
+    useEffect(() => {
+        if (isOnline && offlineQueue.length > 0) {
+            const syncOfflineSales = async () => {
+                const salesToSync = [...offlineQueue]
+                for (const sale of salesToSync) {
+                    try {
+                        await createSaleAction(sale)
+                        // Remove from queue if successful
+                        setOfflineQueue(prev => {
+                            const newQueue = prev.filter(s => s !== sale)
+                            localStorage.setItem(`offline_sales_${businessId}`, JSON.stringify(newQueue))
+                            return newQueue
+                        })
+                    } catch (error) {
+                        console.error("Failed to sync offline sale", error)
+                        break; // Stop syncing if one fails
+                    }
+                }
+            }
+            syncOfflineSales()
+        }
+    }, [isOnline, offlineQueue, businessId])
 
     const formatDate = (date: Date) => {
         const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -185,13 +224,30 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 subtotal: i.subtotal
             }))
 
-            const req = await createSaleAction({
+            const saleData = {
                 businessId,
                 userId,
                 items: saleItems,
                 paymentMethod,
                 total: currentTotal
-            })
+            }
+
+            if (!isOnline) {
+                // Queue the sale locally
+                const newQueue = [...offlineQueue, saleData]
+                setOfflineQueue(newQueue)
+                localStorage.setItem(`offline_sales_${businessId}`, JSON.stringify(newQueue))
+
+                setSaleComplete({
+                    success: true,
+                    change: paymentMethod === 'efectivo' ? change : 0,
+                    saleItems: saleItems,
+                    total: currentTotal
+                })
+                return
+            }
+
+            const req = await createSaleAction(saleData)
 
             if (!req.success) throw new Error(req.error)
 
@@ -202,7 +258,16 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 total: currentTotal
             })
         } catch (err) {
-            alert('Error procesando venta: ' + (err as Error).message)
+            if (!isOnline) {
+                // Fallback if network fails during request
+                const saleData = { businessId, userId, items: saleItems, paymentMethod, total: currentTotal }
+                const newQueue = [...offlineQueue, saleData]
+                setOfflineQueue(newQueue)
+                localStorage.setItem(`offline_sales_${businessId}`, JSON.stringify(newQueue))
+                setSaleComplete({ success: true, change: paymentMethod === 'efectivo' ? change : 0, saleItems, total: currentTotal })
+            } else {
+                alert('Error procesando venta: ' + (err as Error).message)
+            }
         } finally {
             setLoading(false)
         }
@@ -268,14 +333,20 @@ export default function POSClient({ products, userId, userName, businessId, acti
             <nav className="relative z-[60] flex items-center justify-between px-8 py-4 bg-secondary/40 backdrop-blur-2xl border-b border-white/5 shrink-0">
                 <div className="flex items-center gap-8">
                     <Logo className="h-10 md:h-12 w-auto" variant="premium" />
-                    <div className="hidden md:flex items-center gap-6 border-l border-white/5 pl-8">
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1">Terminal ID</span>
-                            <span className="text-xs font-black text-white italic uppercase tracking-tighter">POS-001-EXEC</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.2em] leading-none mb-1">Ubicación</span>
-                            <span className="text-xs font-black text-white/60 italic uppercase tracking-tighter">Planta Central</span>
+                    <div className="hidden lg:flex items-center gap-6 border-r border-white/5 pr-8 mr-4">
+                        <div className="flex flex-col text-right">
+                            <div className="flex items-center justify-end gap-2 mb-1">
+                                {!isOnline && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+                                {offlineQueue.length > 0 && (
+                                    <span className="text-[8px] px-2 py-0.5 bg-primary/20 text-primary border border-primary/20 rounded-full font-black animate-pulse">
+                                        SYNC: {offlineQueue.length}
+                                    </span>
+                                )}
+                                <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em]">Estado Sincronía</span>
+                            </div>
+                            <span className="text-xs font-black text-white italic uppercase tracking-tighter">
+                                {isOnline ? 'Online - Full Sync' : 'Offline - Local Queue'}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -684,9 +755,22 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                     return (
                                         <motion.div
                                             initial={{ opacity: 0, scale: 0.9 }}
-                                            animate={{ opacity: 1, scale: 1 }}
+                                            animate={isLowStock ? {
+                                                opacity: 1,
+                                                scale: 1,
+                                                borderColor: ["rgba(251, 191, 36, 0.1)", "rgba(251, 191, 36, 0.4)", "rgba(251, 191, 36, 0.1)"],
+                                                boxShadow: ["0 0 0 rgba(251, 191, 36, 0)", "0 0 20px rgba(251, 191, 36, 0.1)", "0 0 0 rgba(251, 191, 36, 0)"]
+                                            } : { opacity: 1, scale: 1 }}
+                                            transition={isLowStock ? {
+                                                duration: 2,
+                                                repeat: Infinity,
+                                                ease: "easeInOut"
+                                            } : {}}
                                             key={p.id}
-                                            className="group relative bg-secondary/30 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-5 md:p-7 hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden min-h-[320px]"
+                                            className={cn(
+                                                "group relative bg-secondary/30 backdrop-blur-3xl border rounded-[2.5rem] p-5 md:p-7 hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden min-h-[320px]",
+                                                isLowStock ? "border-amber-500/20" : "border-white/5"
+                                            )}
                                         >
                                             {/* Decorative Glow */}
                                             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-primary/10 transition-colors" />
@@ -1045,6 +1129,6 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
