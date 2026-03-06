@@ -489,7 +489,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
                                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                                className="relative bg-secondary overflow-hidden border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-10 max-w-md w-full shadow-2xl"
+                                className="relative bg-secondary overflow-y-auto border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-10 max-w-md w-full shadow-2xl max-h-[90vh] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
                             >
                                 {/* Modal Background Effect */}
                                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full -mr-32 -mt-32 pointer-events-none" />
