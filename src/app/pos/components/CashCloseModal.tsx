@@ -51,7 +51,9 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
     }
 
     const expectedTotal = (registerData?.openingAmount || 0) +
-        (registerData?.cashSales || 0) -
+        (registerData?.cashSales || 0) +
+        (registerData?.totalAbonos || 0) +
+        (registerData?.totalManualInflows || 0) -
         (registerData?.totalExpenses || 0)
 
     const parsedClosing = parseFloat(amount) || 0
@@ -111,18 +113,22 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
                                         <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.cashSales || 0)}</span>
                                     </div>
                                     <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Gastos Caja (-)</span>
+                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Abonos Clientes (+)</span>
+                                        <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.totalAbonos || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center px-2">
+                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest text-emerald-400/80">Entradas Manuales (+)</span>
+                                        <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.totalManualInflows || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center px-2">
+                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest text-red-400/80">Gastos Caja (-)</span>
                                         <span className="text-xl font-black text-red-400 tabular-nums">{formatCurrency(registerData?.totalExpenses || 0)}</span>
                                     </div>
                                     <div className="h-px bg-white/5 w-full" />
                                     <div className="flex justify-between items-center px-2 bg-primary/5 py-4 rounded-2xl border border-primary/10">
                                         <span className="text-xs font-bold text-primary uppercase tracking-widest">Total Esperado</span>
                                         <span className="text-2xl font-black text-primary tabular-nums">
-                                            {formatCurrency(
-                                                (registerData?.openingAmount || 0) +
-                                                (registerData?.cashSales || 0) -
-                                                (registerData?.totalExpenses || 0)
-                                            )}
+                                            {formatCurrency(expectedTotal)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center px-2 mt-4 opacity-40">

@@ -59,51 +59,65 @@ export async function closeRegister(formData: FormData) {
     revalidatePath('/pos')
 }
 
-export async function processSale(items: { productId: string, quantity: number, price: number, subtotal: number }[], paymentMethod: string, totalAmount: number) {
+export async function processSale(
+    items: { productId: string, quantity: number, price: number, subtotal: number }[],
+    paymentMethod: string,
+    totalAmount: number,
+    customerId?: string,
+    isCredit: boolean = false
+) {
     const user = await getCurrentUser()
 
-    await prisma.$transaction(async (tx) => {
+    // Using Raw SQL for the entire transaction to bypass Prisma Client sync issues in Windows dev environment
+    try {
+        const saleId = crypto.randomUUID()
+
         // 1. Create Sale
-        const sale = await tx.sale.create({
-            data: {
-                businessId: user.businessId,
-                userId: user.id,
-                totalAmount,
-                paymentMethod,
-                saleItems: {
-                    create: items.map(item => ({
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        unitPrice: item.price,
-                        subtotal: item.subtotal
-                    }))
-                }
-            }
-        })
+        await prisma.$executeRaw`
+            INSERT INTO sales (id, "businessId", "userId", "totalAmount", "paymentMethod", "customerId", "isCredit", "createdAt")
+            VALUES (${saleId}, ${user.businessId}, ${user.id}, ${totalAmount}, ${paymentMethod}, ${customerId || null}, ${isCredit}, ${new Date()})
+        `
 
-        // 2. Decrement Stock & Create Inventory Movements
+        // 2. Incremental updates for items and stock
         for (const item of items) {
-            await tx.product.update({
-                where: { id: item.productId },
-                data: {
-                    stockQuantity: { decrement: item.quantity }
-                }
-            })
+            const itemId = crypto.randomUUID()
+            await prisma.$executeRaw`
+                INSERT INTO sale_items (id, "saleId", "productId", quantity, "unitPrice", subtotal)
+                VALUES (${itemId}, ${saleId}, ${item.productId}, ${item.quantity}, ${item.price}, ${item.subtotal})
+            `
 
-            await tx.inventoryMovement.create({
-                data: {
-                    businessId: user.businessId,
-                    productId: item.productId,
-                    movementType: 'venta',
-                    quantity: item.quantity,
-                    referenceId: sale.id
-                }
-            })
+            await prisma.$executeRaw`
+                UPDATE products 
+                SET "stockQuantity" = "stockQuantity" - ${item.quantity}
+                WHERE id = ${item.productId}
+            `
+
+            await prisma.$executeRaw`
+                INSERT INTO inventory_movements (id, "businessId", "productId", "movementType", quantity, "referenceId", "createdAt")
+                VALUES (${crypto.randomUUID()}, ${user.businessId}, ${item.productId}, 'venta', ${item.quantity}, ${saleId}, ${new Date()})
+            `
         }
-    })
 
-    revalidatePath('/pos')
-    return { success: true }
+        // 3. Update Customer Debt if Credit
+        if (isCredit && customerId) {
+            await prisma.$executeRaw`
+                UPDATE customers
+                SET "currentDebt" = "currentDebt" + ${totalAmount}
+                WHERE id = ${customerId}
+            `
+
+            await prisma.$executeRaw`
+                INSERT INTO credit_transactions (id, "customerId", amount, type, description, "createdAt")
+                VALUES (${crypto.randomUUID()}, ${customerId}, ${totalAmount}, 'cargos', 'Venta a crédito', ${new Date()})
+            `
+        }
+
+        revalidatePath('/pos')
+        return { success: true, saleId }
+    } catch (error) {
+        console.error("Sale Processing Error:", error)
+        throw error
+    }
 }
 
 export async function createExpenseAction(amount: number, description: string) {
@@ -126,6 +140,27 @@ export async function createExpenseAction(amount: number, description: string) {
             description
         }
     })
+
+    revalidatePath('/pos')
+    return { success: true }
+}
+
+export async function createInflowAction(amount: number, description: string) {
+    const user = await getCurrentUser()
+
+    const openRegister = await prisma.cashRegister.findFirst({
+        where: {
+            openedById: user.id,
+            closedAt: null
+        }
+    })
+
+    if (!openRegister) throw new Error('No hay una caja abierta para este usuario')
+
+    await prisma.$executeRaw`
+        INSERT INTO cash_inflows (id, "businessId", "cashRegisterId", amount, description, "createdAt")
+        VALUES (${crypto.randomUUID()}, ${user.businessId}, ${openRegister.id}, ${amount}, ${description}, ${new Date()})
+    `
 
     revalidatePath('/pos')
     return { success: true }

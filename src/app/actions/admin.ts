@@ -116,8 +116,21 @@ export async function getAdminMetricsAction() {
             take: 10
         });
 
+        // 5. Ventas por tipo de pago (POS) usando Raw SQL para evitar problemas de sincronización de Prisma
+        const salesByType: any[] = await prisma.$queryRaw`
+            SELECT "isCredit", SUM("totalAmount") as total
+            FROM sales
+            WHERE "createdAt" >= ${start} AND "createdAt" <= ${end}
+            GROUP BY "isCredit"
+        `;
+
+        const cashPOS = Number(salesByType.find(s => s.isCredit === false)?.total || 0);
+        const creditPOS = Number(salesByType.find(s => s.isCredit === true)?.total || 0);
+
         return {
             totalRevenue: todayAmount,
+            cashRevenue: cashPOS + Number(todayDistOrders._sum.totalAmount || 0),
+            creditRevenue: creditPOS,
             totalOrders: todaySales._count.id + (await prisma.distributorOrder.count({ where: { createdAt: { gte: start, lte: end } } })),
             activeDistributors: await prisma.distributor.count(),
             lowStockCount: stockAlerts,
@@ -564,6 +577,8 @@ export async function getCashRegistersAction() {
             closedBy: r.closedBy,
             openingAmount: Number(r.openingAmount),
             closingAmount: r.closingAmount !== null ? Number(r.closingAmount) : null,
+            expectedAmount: r.expectedAmount !== null ? Number(r.expectedAmount) : null,
+            discrepancyAmount: r.discrepancyAmount !== null ? Number(r.discrepancyAmount) : null,
             openedAt: r.openedAt,
             closedAt: r.closedAt,
         }));
@@ -572,40 +587,211 @@ export async function getCashRegistersAction() {
     }
 }
 
-export async function getSalesAction() {
+export async function getRegisterDetailsAction(registerId: string) {
     await ensureAdmin();
     try {
-        const sales = await prisma.sale.findMany({
-            include: {
-                saleItems: {
-                    include: {
-                        product: true
-                    }
-                },
-                user: true
-            },
-            orderBy: { createdAt: "desc" },
-            take: 50 // Limit to latest 50 for performance
-        });
+        // 1. Registro principal con usuarios
+        const registers: any[] = await prisma.$queryRaw`
+            SELECT r.*, 
+                   uo.name as "openedByName", uo.email as "openedByEmail",
+                   uc.name as "closedByName", uc.email as "closedByEmail"
+            FROM cash_registers r
+            LEFT JOIN users uo ON r."openedById" = uo.id
+            LEFT JOIN users uc ON r."closedById" = uc.id
+            WHERE r.id = ${registerId}
+        `;
 
-        return sales.map((s: any) => ({
-            ...s,
-            totalAmount: Number(s.totalAmount),
-            saleItems: s.saleItems.map((si: any) => ({
-                ...si,
-                unitPrice: Number(si.unitPrice),
-                subtotal: Number(si.subtotal),
-                quantity: Number(si.quantity),
-                product: {
-                    ...si.product,
-                    pricePublic: Number(si.product.pricePublic),
-                    priceDistributor: Number(si.product.priceDistributor),
-                    stockQuantity: Number(si.product.stockQuantity),
-                    minimumStockAlert: Number(si.product.minimumStockAlert),
-                }
-            }))
+        if (registers.length === 0) throw new Error("Registro no encontrado");
+        const registerData = registers[0];
+        const endTime = registerData.closedAt || new Date();
+
+        // 2. Ventas
+        const sales: any[] = await prisma.$queryRaw`
+            SELECT s.*, c.name as "customerName"
+            FROM sales s
+            LEFT JOIN customers c ON s."customerId" = c.id
+            WHERE s."userId" = ${registerData.openedById}
+            AND s."createdAt" >= ${registerData.openedAt}
+            AND s."createdAt" <= ${endTime}
+            ORDER BY s."createdAt" DESC
+        `;
+
+        // 3. Gastos
+        const expenses: any[] = await prisma.$queryRaw`
+            SELECT * FROM expenses 
+            WHERE "cashRegisterId" = ${registerId}
+            ORDER BY "createdAt" DESC
+        `;
+
+        // 4. Entradas Manuales
+        const inflows: any[] = await prisma.$queryRaw`
+            SELECT * FROM cash_inflows 
+            WHERE "cashRegisterId" = ${registerId}
+            ORDER BY "createdAt" DESC
+        `;
+
+        // 5. Abonos de clientes
+        const abonos: any[] = await prisma.$queryRaw`
+            SELECT t.id, t.amount, t."createdAt", t.description, c.name as "customerName"
+            FROM credit_transactions t
+            JOIN customers c ON t."customerId" = c.id
+            WHERE t.type = 'abonos'
+            AND t."createdAt" >= ${registerData.openedAt}
+            AND t."createdAt" <= ${endTime}
+            AND c."businessId" = ${registerData.businessId}
+            ORDER BY t."createdAt" DESC
+        `;
+
+        return {
+            register: {
+                ...registerData,
+                openingAmount: Number(registerData.openingAmount),
+                closingAmount: registerData.closingAmount ? Number(registerData.closingAmount) : null,
+                expectedAmount: registerData.expectedAmount ? Number(registerData.expectedAmount) : null,
+                discrepancyAmount: registerData.discrepancyAmount ? Number(registerData.discrepancyAmount) : null,
+                openedBy: { name: registerData.openedByName, email: registerData.openedByEmail },
+                closedBy: registerData.closedByName ? { name: registerData.closedByName, email: registerData.closedByEmail } : null
+            },
+            sales: sales.map(s => ({ ...s, totalAmount: Number(s.totalAmount) })),
+            expenses: expenses.map(e => ({ ...e, amount: Number(e.amount) })),
+            inflows: inflows.map(i => ({ ...i, amount: Number(i.amount) })),
+            abonos: abonos.map(a => ({ ...a, amount: Number(a.amount) }))
+        };
+    } catch (error) {
+        console.error("Error fetching register details:", error);
+        throw new Error("Error al obtener los detalles del corte");
+    }
+}
+
+export async function getSalesAction(dateStr?: string) {
+    await ensureAdmin();
+    try {
+        let dateFilter = "";
+        if (dateStr) {
+            // dateStr is expected in YYYY-MM-DD format from client
+            dateFilter = `WHERE s."createdAt"::date = ${dateStr}::date`;
+        }
+
+        // Use raw SQL to join with customers as Prisma client might be out of sync
+        const sales: any[] = await prisma.$queryRawUnsafe(`
+            SELECT s.*, u.name as "userName", c.name as "customerName"
+            FROM sales s
+            LEFT JOIN users u ON s."userId" = u.id
+            LEFT JOIN customers c ON s."customerId" = c.id
+            ${dateFilter}
+            ORDER BY s."createdAt" DESC
+            LIMIT 200
+        `);
+
+        // We still need to fetch items for each sale. For simplicity in this large file:
+        const enrichedSales = await Promise.all(sales.map(async (s) => {
+            const items = await prisma.saleItem.findMany({
+                where: { saleId: s.id },
+                include: { product: true }
+            });
+            return {
+                ...s,
+                totalAmount: Number(s.totalAmount),
+                user: { name: s.userName },
+                customer: s.customerName ? { name: s.customerName } : null,
+                saleItems: items.map((si: any) => ({
+                    ...si,
+                    unitPrice: Number(si.unitPrice),
+                    subtotal: Number(si.subtotal),
+                    quantity: Number(si.quantity),
+                    product: {
+                        ...si.product,
+                        pricePublic: Number(si.product.pricePublic),
+                        priceDistributor: Number(si.product.priceDistributor),
+                        stockQuantity: Number(si.product.stockQuantity),
+                        minimumStockAlert: Number(si.product.minimumStockAlert),
+                    }
+                }))
+            };
+        }));
+
+        return enrichedSales;
+    } catch (error) {
+        console.error("Error fetching sales history:", error);
+        throw new Error("Error al obtener historial de ventas");
+    }
+}
+
+// ==========================================
+// CLIENTES (CRUD)
+// ==========================================
+
+export async function getCustomersAction() {
+    await ensureAdmin();
+    try {
+        const customers = await prisma.$queryRaw<any[]>`
+            SELECT * FROM customers ORDER BY name ASC
+        `;
+        return customers.map(c => ({
+            ...c,
+            creditLimit: Number(c.creditLimit),
+            currentDebt: Number(c.currentDebt)
         }));
     } catch (error) {
-        throw new Error("Error al obtener historial de ventas");
+        throw new Error("Error al obtener clientes");
+    }
+}
+
+export async function createCustomerAdminAction(data: {
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    creditLimit: number;
+}) {
+    await ensureAdmin();
+    try {
+        const business = await prisma.business.findFirst();
+        if (!business) throw new Error("Business no encontrado");
+
+        await prisma.$executeRaw`
+            INSERT INTO customers (id, "businessId", name, phone, email, address, "creditLimit", "currentDebt", active, "createdAt")
+            VALUES (${crypto.randomUUID()}, ${business.id}, ${data.name}, ${data.phone || null}, ${data.email || null}, ${data.address || null}, ${data.creditLimit}, 0, true, ${new Date()})
+        `;
+
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al crear cliente" };
+    }
+}
+
+export async function updateCustomerAction(id: string, data: {
+    name: string;
+    phone?: string;
+    email?: string;
+    address?: string;
+    creditLimit: number;
+}) {
+    await ensureAdmin();
+    try {
+        await prisma.$executeRaw`
+            UPDATE customers
+            SET name = ${data.name}, phone = ${data.phone || null}, email = ${data.email || null}, address = ${data.address || null}, "creditLimit" = ${data.creditLimit}
+            WHERE id = ${id}
+        `;
+
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al actualizar cliente" };
+    }
+}
+
+export async function toggleCustomerActiveAction(id: string, active: boolean) {
+    await ensureAdmin();
+    try {
+        await prisma.$executeRaw`
+            UPDATE customers SET active = ${active} WHERE id = ${id}
+        `;
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al cambiar estado" };
     }
 }

@@ -28,12 +28,19 @@ model Business {
   inventoryMovements InventoryMovement[]
   cashRegisters      CashRegister[]
   expenses           Expense[]
+  inflows            CashInflow[]
   dailyMetrics       DailyMetric[]
 
   // Nuevas configuraciones
   volumeDiscountActive    Boolean @default(false)
   volumeDiscountThreshold Decimal @default(5.0) @db.Decimal(10, 2)
   volumeDiscountPercentage Decimal @default(5.0) @db.Decimal(10, 2)
+
+  // Phase 2: Dashboard & Supervisor
+  dailyGoal             Decimal @default(10000.0) @db.Decimal(10, 2)
+  supervisorPIN         String  @default("1234")
+
+  customers             Customer[]
 
   @@map("businesses")
 }
@@ -96,6 +103,11 @@ model Sale {
   business  Business   @relation(fields: [businessId], references: [id])
   user      User       @relation(fields: [userId], references: [id])
   saleItems SaleItem[]
+
+  // Phase 2: Credit
+  customerId String?
+  isCredit   Boolean @default(false)
+  customer   Customer? @relation(fields: [customerId], references: [id])
 
   @@index([businessId])
   @@index([createdAt])
@@ -208,6 +220,7 @@ model CashRegister {
   openedBy User     @relation("OpenedBy", fields: [openedById], references: [id])
   closedBy User?    @relation("ClosedBy", fields: [closedById], references: [id])
   expenses Expense[]
+  inflows  CashInflow[]
 
   @@map("cash_registers")
 }
@@ -226,6 +239,20 @@ model Expense {
   @@map("expenses")
 }
 
+model CashInflow {
+  id             String   @id @default(uuid())
+  businessId     String
+  cashRegisterId String
+  amount         Decimal  @db.Decimal(10, 2)
+  description    String
+  createdAt      DateTime @default(now())
+
+  business     Business     @relation(fields: [businessId], references: [id])
+  cashRegister CashRegister @relation(fields: [cashRegisterId], references: [id])
+
+  @@map("cash_inflows")
+}
+
 model DailyMetric {
   id          String   @id @default(uuid())
   businessId  String
@@ -239,4 +266,36 @@ model DailyMetric {
 
   @@unique([businessId, date])
   @@map("daily_metrics")
+}
+
+model Customer {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  phone      String?
+  email      String?
+  address    String?
+  creditLimit Decimal @default(1000.0) @db.Decimal(10, 2)
+  currentDebt Decimal @default(0.0) @db.Decimal(10, 2)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  business     Business      @relation(fields: [businessId], references: [id])
+  sales        Sale[]
+  transactions CreditTransaction[]
+
+  @@map("customers")
+}
+
+model CreditTransaction {
+  id          String   @id @default(uuid())
+  customerId  String
+  amount      Decimal  @db.Decimal(10, 2)
+  type        String   // "cargos" | "abonos"
+  description String?
+  createdAt   DateTime @default(now())
+
+  customer    Customer @relation(fields: [customerId], references: [id])
+
+  @@map("credit_transactions")
 }

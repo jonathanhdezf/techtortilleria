@@ -11,7 +11,7 @@ interface CartState {
     removeItem: (productId: string) => void
     updateQuantity: (productId: string, quantity: number) => void
     clearCart: () => void
-    getTotal: () => number
+    getTotal: (discountSettings?: { active: boolean, threshold: number, percentage: number }) => number
 }
 
 export const useCartStore = create<CartState>((set, get) => ({

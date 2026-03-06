@@ -3,26 +3,35 @@
 import { useState, useEffect } from 'react'
 import {
     ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, PackageOpen, Loader2,
-    X, CheckCircle, Search, ChevronRight, Package, Printer, Zap, ShieldCheck, User, Settings, LogOut
+    X, CheckCircle, Search, ChevronRight, Package, Printer, Zap, ShieldCheck, User, Settings, LogOut, TrendingUp
 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { useCartStore, CartProduct } from '@/store/cartStore'
 import { createSaleAction, getSalesHistoryAction } from '@/app/actions/pos'
+import { useRouter } from 'next/navigation'
 import { generateTicketPDF } from '@/lib/pdf'
 import { motion, AnimatePresence } from 'framer-motion'
 import React, { useRef } from 'react'
 import Logo from '@/components/shared/Logo'
+import { CustomerSearchModal } from './CustomerSearchModal'
+import { getBusinessSettings, processSale } from '../actions'
 
 import CashCloseModal from './CashCloseModal'
 import AmountSaleModal from './AmountSaleModal'
 import ExpenseModal from './ExpenseModal'
 import CalendarModal from './CalendarModal'
+import { CajeroDashboard } from './CajeroDashboard'
+import { SupervisorPINModal } from './SupervisorPINModal'
+import CreditPaymentModal from './CreditPaymentModal'
+import CashInflowModal from './CashInflowModal'
+import ShiftDetailsModal from './ShiftDetailsModal'
 
 import { useModalAccessibility } from "@/hooks/useModalAccessibility";
 
 const CATEGORIES = ['Kilo', 'Medio Kilo', 'Masa', 'Salsas', 'Bebidas']
 
 export default function POSClient({ products, userId, userName, businessId, activeRegister, shiftSummary }: { products: any[], userId: string, userName?: string | null, businessId: string, activeRegister?: any, shiftSummary?: any }) {
+    const router = useRouter()
     const { items, addItem, removeItem, updateQuantity, clearCart, getTotal } = useCartStore()
     const [paymentMethod, setPaymentMethod] = useState('efectivo')
     const [loading, setLoading] = useState(false)
@@ -37,6 +46,16 @@ export default function POSClient({ products, userId, userName, businessId, acti
     const [selectedProductForAmount, setSelectedProductForAmount] = useState<any>(null)
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false)
     const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+    const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
+    const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+    const [businessSettings, setBusinessSettings] = useState<any>(null)
+    const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false)
+    const [supervisorAction, setSupervisorAction] = useState<any>(null)
+    const [isAbonoMode, setIsAbonoMode] = useState(false)
+    const [isCreditPaymentModalOpen, setIsCreditPaymentModalOpen] = useState(false)
+    const [customerForAbono, setCustomerForAbono] = useState<any>(null)
+    const [isInflowModalOpen, setIsInflowModalOpen] = useState(false)
+    const [isShiftDetailsModalOpen, setIsShiftDetailsModalOpen] = useState(false)
 
     // Mobile state
     const [isCartOpen, setIsCartOpen] = useState(false)
@@ -53,6 +72,8 @@ export default function POSClient({ products, userId, userName, businessId, acti
     const userMenuRef = useRef<HTMLDivElement>(null)
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
     const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+    const [showDashboard, setShowDashboard] = useState(true)
+    const [isMounted, setIsMounted] = useState(false)
 
     // Modal Accessibility Hooks
     useModalAccessibility(isUserMenuOpen, () => setIsUserMenuOpen(false))
@@ -62,6 +83,8 @@ export default function POSClient({ products, userId, userName, businessId, acti
     useModalAccessibility(isExpenseModalOpen, () => setIsExpenseModalOpen(false))
     useModalAccessibility(isCloseModalOpen, () => setIsCloseModalOpen(false))
     useModalAccessibility(isCalendarOpen, () => setIsCalendarOpen(false))
+    useModalAccessibility(isInflowModalOpen, () => setIsInflowModalOpen(false))
+    useModalAccessibility(isShiftDetailsModalOpen, () => setIsShiftDetailsModalOpen(false))
 
     const filteredProducts = products.filter(p => {
         const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory
@@ -75,6 +98,12 @@ export default function POSClient({ products, userId, userName, businessId, acti
     }
 
     useEffect(() => {
+        const savedDashboard = localStorage.getItem('pos_show_dashboard')
+        if (savedDashboard !== null) {
+            setShowDashboard(savedDashboard === 'true')
+        }
+        setIsMounted(true)
+
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
 
         function handleClickOutside(event: MouseEvent) {
@@ -203,7 +232,19 @@ export default function POSClient({ products, userId, userName, businessId, acti
 
     const timeData = formatDate(currentTime)
 
-    const currentTotal = getTotal()
+    useEffect(() => {
+        async function loadSettings() {
+            const settings = await getBusinessSettings()
+            setBusinessSettings(settings)
+        }
+        loadSettings()
+    }, [])
+
+    const currentTotal = businessSettings ? getTotal({
+        active: businessSettings.volumeDiscountActive,
+        threshold: businessSettings.volumeDiscountThreshold,
+        percentage: businessSettings.volumeDiscountPercentage
+    }) : getTotal()
     const parsedCash = parseFloat(cashReceived) || 0
     const change = parsedCash - currentTotal
 
@@ -214,24 +255,32 @@ export default function POSClient({ products, userId, userName, businessId, acti
             return
         }
 
+        if (paymentMethod === 'crédito' && !selectedCustomer) {
+            alert('Por favor, selecciona un cliente para la venta a crédito.')
+            setIsCustomerModalOpen(true)
+            return
+        }
+
         setLoading(true)
+        const saleItems = items.map(i => ({
+            productId: i.id,
+            name: i.name,
+            quantity: i.quantity,
+            priceAtTime: Number(i.pricePublic),
+            subtotal: i.subtotal
+        }))
+
+        const saleData = {
+            businessId,
+            userId,
+            items: saleItems,
+            paymentMethod,
+            total: currentTotal,
+            customerId: selectedCustomer?.id,
+            isCredit: paymentMethod === 'crédito'
+        }
+
         try {
-            const saleItems = items.map(i => ({
-                productId: i.id,
-                name: i.name,
-                quantity: i.quantity,
-                priceAtTime: Number(i.pricePublic),
-                subtotal: i.subtotal
-            }))
-
-            const saleData = {
-                businessId,
-                userId,
-                items: saleItems,
-                paymentMethod,
-                total: currentTotal
-            }
-
             if (!isOnline) {
                 // Queue the sale locally
                 const newQueue = [...offlineQueue, saleData]
@@ -244,12 +293,27 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     saleItems: saleItems,
                     total: currentTotal
                 })
+                setSelectedCustomer(null)
+                setPaymentMethod('efectivo')
                 return
             }
 
-            const req = await createSaleAction(saleData)
+            const req = await processSale(
+                saleItems.map(i => ({
+                    productId: i.productId,
+                    quantity: i.quantity,
+                    price: i.priceAtTime,
+                    subtotal: i.subtotal
+                })),
+                paymentMethod,
+                currentTotal,
+                selectedCustomer?.id,
+                paymentMethod === 'crédito'
+            )
 
-            if (!req.success) throw new Error(req.error)
+            if (!req.success) throw new Error('Error al procesar la venta');
+
+            router.refresh()
 
             setSaleComplete({
                 success: true,
@@ -257,10 +321,11 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 saleItems: saleItems,
                 total: currentTotal
             })
+            setSelectedCustomer(null)
+            setPaymentMethod('efectivo')
         } catch (err) {
             if (!isOnline) {
                 // Fallback if network fails during request
-                const saleData = { businessId, userId, items: saleItems, paymentMethod, total: currentTotal }
                 const newQueue = [...offlineQueue, saleData]
                 setOfflineQueue(newQueue)
                 localStorage.setItem(`offline_sales_${businessId}`, JSON.stringify(newQueue))
@@ -386,6 +451,32 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                     <button
                                         onClick={() => {
                                             setIsUserMenuOpen(false);
+                                            setIsShiftDetailsModalOpen(true);
+                                        }}
+                                        className="flex items-center gap-4 px-5 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-white/60 hover:bg-white/10 border border-transparent hover:border-primary/20"
+                                    >
+                                        <PackageOpen className="w-5 h-5 text-primary" />
+                                        <div className="text-left">
+                                            <span className="block italic">Ver Movimientos</span>
+                                            <span className="text-[8px] opacity-40 lowercase not-italic tracking-normal">Detalle de abonos, entradas y gastos</span>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsUserMenuOpen(false);
+                                            setIsInflowModalOpen(true);
+                                        }}
+                                        className="flex items-center gap-4 px-5 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-primary hover:bg-primary/10 border border-transparent hover:border-primary/20"
+                                    >
+                                        <TrendingUp className="w-5 h-5 text-emerald-400" />
+                                        <div className="text-left">
+                                            <span className="block italic">Registrar Entrada</span>
+                                            <span className="text-[8px] opacity-40 lowercase not-italic tracking-normal">Ingreso manual de efectivo</span>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsUserMenuOpen(false);
                                             setIsExpenseModalOpen(true);
                                         }}
                                         className="flex items-center gap-4 px-5 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20"
@@ -394,6 +485,20 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                         <div className="text-left">
                                             <span className="block">Registrar Gasto</span>
                                             <span className="text-[8px] opacity-40 lowercase not-italic tracking-normal">Salida de efectivo de caja</span>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsUserMenuOpen(false);
+                                            setIsAbonoMode(true);
+                                            setIsCustomerModalOpen(true);
+                                        }}
+                                        className="flex items-center gap-4 px-5 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-emerald-400 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20"
+                                    >
+                                        <CreditCard className="w-5 h-5" />
+                                        <div className="text-left">
+                                            <span className="block">Abonar a Cliente</span>
+                                            <span className="text-[8px] opacity-40 lowercase not-italic tracking-normal">Pago de deuda de cliente</span>
                                         </div>
                                     </button>
                                     <button
@@ -409,21 +514,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                             <span className="text-[8px] opacity-40 lowercase not-italic tracking-normal">Haciendo corte de caja</span>
                                         </div>
                                     </button>
-                                    <button
-                                        onClick={async () => {
-                                            if (confirm('¿Estás seguro que deseas salir sin hacer corte?')) {
-                                                const { logoutAction } = await import('@/app/actions/auth');
-                                                await logoutAction();
-                                            }
-                                        }}
-                                        className="flex items-center gap-4 px-5 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20"
-                                    >
-                                        <LogOut className="w-5 h-5" />
-                                        <div className="text-left">
-                                            <span className="block">Salir sin Corte</span>
-                                            <span className="text-[8px] opacity-40 lowercase not-italic tracking-normal">Finalizar sesión directamente</span>
-                                        </div>
-                                    </button>
+
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -435,8 +526,12 @@ export default function POSClient({ products, userId, userName, businessId, acti
                             className="flex flex-col text-right hover:opacity-70 transition-opacity"
                             title="Ver Calendario"
                         >
-                            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">{timeData.day} {timeData.date}</span>
-                            <span className="text-xl font-black text-white tabular-nums tracking-tighter leading-none">{timeData.time}</span>
+                            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-1">
+                                {isMounted ? `${timeData.day} ${timeData.date}` : '-- --'}
+                            </span>
+                            <span className="text-xl font-black text-white tabular-nums tracking-tighter leading-none">
+                                {isMounted ? timeData.time : '00:00:00'}
+                            </span>
                         </button>
                     </div>
 
@@ -499,6 +594,28 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                         )}
                                     >
                                         <Printer className="w-4 h-4" /> Historial
+                                    </button>
+                                    <div className="h-px bg-white/5 my-1" />
+                                    <button
+                                        onClick={() => {
+                                            const newVal = !showDashboard;
+                                            setShowDashboard(newVal);
+                                            localStorage.setItem('pos_show_dashboard', String(newVal));
+                                        }}
+                                        className="flex items-center justify-between px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all text-white/40 hover:bg-white/5 hover:text-white"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <TrendingUp className="w-4 h-4" /> Dashboard
+                                        </div>
+                                        <div className={cn(
+                                            "w-8 h-4 rounded-full relative transition-colors p-1",
+                                            showDashboard ? "bg-primary" : "bg-white/10"
+                                        )}>
+                                            <motion.div
+                                                animate={{ x: showDashboard ? 16 : 0 }}
+                                                className="w-2 h-2 bg-secondary rounded-full"
+                                            />
+                                        </div>
                                     </button>
                                     <div className="h-px bg-white/5 my-1" />
                                     <button
@@ -1054,9 +1171,12 @@ export default function POSClient({ products, userId, userName, businessId, acti
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="grid grid-cols-3 gap-4 mb-8">
                             <button
-                                onClick={() => setPaymentMethod('efectivo')}
+                                onClick={() => {
+                                    setPaymentMethod('efectivo')
+                                    setSelectedCustomer(null)
+                                }}
                                 className={cn(
                                     "flex flex-col items-center justify-center gap-3 py-6 rounded-3xl border transition-all active:scale-95 group",
                                     paymentMethod === 'efectivo'
@@ -1068,7 +1188,10 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">Efectivo</span>
                             </button>
                             <button
-                                onClick={() => setPaymentMethod('tarjeta')}
+                                onClick={() => {
+                                    setPaymentMethod('tarjeta')
+                                    setSelectedCustomer(null)
+                                }}
                                 className={cn(
                                     "flex flex-col items-center justify-center gap-3 py-6 rounded-3xl border transition-all active:scale-95 group",
                                     paymentMethod === 'tarjeta'
@@ -1079,7 +1202,50 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                 <CreditCard className={cn("w-6 h-6 transition-transform group-hover:scale-110", paymentMethod === 'tarjeta' && "text-primary")} />
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">Tarjeta</span>
                             </button>
+                            <button
+                                onClick={() => setIsCustomerModalOpen(true)}
+                                className={cn(
+                                    "flex flex-col items-center justify-center gap-3 py-6 rounded-3xl border transition-all active:scale-95 group relative overflow-hidden",
+                                    paymentMethod === 'crédito'
+                                        ? "bg-secondary text-primary border-primary/20 shadow-xl shadow-black/40"
+                                        : "bg-white/5 hover:bg-white/10 text-surface/20 hover:text-white border-white/5"
+                                )}
+                            >
+                                <User className={cn("w-6 h-6 transition-transform group-hover:scale-110", paymentMethod === 'crédito' && "text-primary")} />
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Crédito</span>
+                                {selectedCustomer && (
+                                    <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                )}
+                            </button>
                         </div>
+
+                        {selectedCustomer && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-2xl flex items-center justify-between"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                                        <User className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-primary uppercase tracking-widest">Cliente Seleccionado</p>
+                                        <p className="text-xs font-bold text-white uppercase italic">{selectedCustomer.name}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setSelectedCustomer(null)
+                                        setPaymentMethod('efectivo')
+                                    }}
+                                    title="Quitar cliente"
+                                    className="p-2 hover:bg-white/5 rounded-lg text-white/20 hover:text-red-500 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </motion.div>
+                        )}
 
                         <button
                             disabled={items.length === 0 || loading}
@@ -1129,6 +1295,73 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     </button>
                 </div>
             </div>
+
+            <CustomerSearchModal
+                isOpen={isCustomerModalOpen}
+                onClose={() => {
+                    setIsCustomerModalOpen(false);
+                    setIsAbonoMode(false);
+                }}
+                onSelect={(customer) => {
+                    if (isAbonoMode) {
+                        setCustomerForAbono(customer);
+                        setIsCreditPaymentModalOpen(true);
+                        setIsCustomerModalOpen(false);
+                        setIsAbonoMode(false);
+                    } else {
+                        setSelectedCustomer(customer)
+                        setPaymentMethod('crédito')
+                        setIsCustomerModalOpen(false)
+                    }
+                }}
+            />
+
+            <CreditPaymentModal
+                isOpen={isCreditPaymentModalOpen}
+                customer={customerForAbono}
+                onClose={() => setIsCreditPaymentModalOpen(false)}
+                onSuccess={() => {
+                    // Logic to refresh or just rely on revalidatePath
+                }}
+            />
+
+            <CashInflowModal
+                isOpen={isInflowModalOpen}
+                onClose={() => setIsInflowModalOpen(false)}
+            />
+
+            <ShiftDetailsModal
+                isOpen={isShiftDetailsModalOpen}
+                onClose={() => setIsShiftDetailsModalOpen(false)}
+                shiftSummary={shiftSummary}
+            />
+
+            {/* Phase 2: Supervisor Authorization Modal */}
+            <SupervisorPINModal
+                isOpen={isSupervisorModalOpen}
+                onClose={() => {
+                    setIsSupervisorModalOpen(false)
+                    setSupervisorAction(null)
+                }}
+                onSuccess={() => {
+                    if (supervisorAction) supervisorAction()
+                    setIsSupervisorModalOpen(false)
+                    setSupervisorAction(null)
+                }}
+                correctPIN={businessSettings?.supervisorPIN || '1234'}
+            />
+
+            {/* Module 2: Cashier Dashboard - Statistics floating bar */}
+            {shiftSummary && showDashboard && (
+                <CajeroDashboard
+                    shiftSummary={{
+                        totalVentas: shiftSummary.totalVentas || 0,
+                        ventaMasGrande: shiftSummary.ventaMasGrande || 0,
+                        productoEstrella: shiftSummary.productoEstrella || 'Ninguno'
+                    }}
+                    dailyGoal={Number(businessSettings?.dailyGoal || 10000)}
+                />
+            )}
         </div >
     );
 }

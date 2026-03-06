@@ -4,8 +4,8 @@ import React, { useState, useEffect } from "react";
 import {
     TrendingUp, TrendingDown, Users, ShoppingCart, AlertCircle,
     BarChart3, Settings, LogOut, Search, Bell, Loader2,
-    Package, ClipboardList, UserCog, History, X, Plus, Pencil, ToggleLeft, ToggleRight, Truck, Trash2, Printer, Eye,
-    ArrowUpRight, ArrowDownRight, Scale, Clock, ChevronRight, Mail, Shield, CheckCircle, User
+    Package, ClipboardList, UserCog, History, X, Plus, Pencil, ToggleLeft, ToggleRight, Truck, Trash2, Printer, Eye, Calendar,
+    ArrowUpRight, ArrowDownRight, Scale, Clock, ChevronRight, Mail, Shield, CheckCircle, User, CreditCard, Banknote
 } from "lucide-react";
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -25,12 +25,15 @@ import {
     createProductAction, updateProductAction, toggleProductActiveAction,
     getInventoryMovementsAction, createInventoryMovementAction,
     getUsersAction, createUserAction, updateUserAction, toggleUserActiveAction,
-    getCashRegistersAction
+    getCashRegistersAction, getCustomersAction, createCustomerAdminAction,
+    updateCustomerAction, toggleCustomerActiveAction, getRegisterDetailsAction
 } from "@/app/actions/admin";
 import { logoutAction } from "@/app/actions/auth";
 
 interface AdminMetrics {
     totalRevenue: number;
+    cashRevenue: number;
+    creditRevenue: number;
     totalOrders: number;
     activeDistributors: number;
     lowStockCount: number;
@@ -68,10 +71,15 @@ export default function AdminClient() {
     // Modal states
     const [productModal, setProductModal] = useState<{ open: boolean, editing: boolean, data: any }>({ open: false, editing: false, data: null });
     const [userModal, setUserModal] = useState<{ open: boolean, editing: boolean, data: any }>({ open: false, editing: false, data: null });
+    const [customerModal, setCustomerModal] = useState<{ open: boolean, editing: boolean, data: any }>({ open: false, editing: false, data: null });
     const [saleDetailModal, setSaleDetailModal] = useState<{ open: boolean, data: any }>({ open: false, data: null });
     const [movementModal, setMovementModal] = useState(false);
+    const [registerDetailModal, setRegisterDetailModal] = useState<{ open: boolean, data: any }>({ open: false, data: null });
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [formError, setFormError] = useState("");
     const [saving, setSaving] = useState(false);
+    const [visibleSalesCount, setVisibleSalesCount] = useState(5);
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Form states
     const [pForm, setPForm] = useState({
@@ -80,12 +88,15 @@ export default function AdminClient() {
     });
     const [uForm, setUForm] = useState({ name: "", email: "", password: "", role: "CAJERO" });
     const [mForm, setMForm] = useState({ productId: "", movementType: "entrada_produccion", quantity: 0 });
+    const [cForm, setCForm] = useState({ name: "", phone: "", email: "", address: "", creditLimit: 0 });
 
     // Modal accessibility hooks
     useModalAccessibility(productModal.open, () => setProductModal({ ...productModal, open: false }));
     useModalAccessibility(userModal.open, () => setUserModal({ ...userModal, open: false }));
     useModalAccessibility(movementModal, () => setMovementModal(false));
     useModalAccessibility(saleDetailModal.open, () => setSaleDetailModal({ open: false, data: null }));
+    useModalAccessibility(customerModal.open, () => setCustomerModal({ ...customerModal, open: false }));
+    useModalAccessibility(registerDetailModal.open, () => setRegisterDetailModal({ open: false, data: null }));
 
     const loadData = async () => {
         try {
@@ -112,6 +123,9 @@ export default function AdminClient() {
             } else if (activeTab === "cortes") {
                 const cData = await getCashRegistersAction();
                 if (activeTab === "cortes") setSecondaryData(cData);
+            } else if (activeTab === "clientes") {
+                const clData = await getCustomersAction();
+                if (activeTab === "clientes") setSecondaryData(clData);
             }
         } catch (error) {
             console.error("Error loading admin data");
@@ -134,6 +148,7 @@ export default function AdminClient() {
         setSecondaryData(null); // Limpiar datos previos para evitar errores de renderizado
         setActiveTab(tab);
         setIsSidebarOpen(false);
+        if (tab === "ventas") setVisibleSalesCount(5); // Resetear contador al cambiar a ventas
     };
 
     // Product modal helpers
@@ -206,10 +221,68 @@ export default function AdminClient() {
         else setFormError(res.error || "Error");
     };
 
+    // Customer modal helpers
+    const openNewCustomer = () => {
+        setCForm({ name: "", phone: "", email: "", address: "", creditLimit: 1000 });
+        setCustomerModal({ open: true, editing: false, data: null });
+        setFormError("");
+    };
+
+    const openEditCustomer = (customer: any) => {
+        setCForm({
+            name: customer.name,
+            phone: customer.phone || "",
+            email: customer.email || "",
+            address: customer.address || "",
+            creditLimit: customer.creditLimit
+        });
+        setCustomerModal({ open: true, editing: true, data: customer });
+        setFormError("");
+    };
+
+    const handleSaveCustomer = async () => {
+        if (!cForm.name) { setFormError("El nombre es obligatorio"); return; }
+        setSaving(true); setFormError("");
+        try {
+            const res = customerModal.editing
+                ? await updateCustomerAction(customerModal.data.id, cForm)
+                : await createCustomerAdminAction(cForm);
+
+            if (res.success) {
+                setCustomerModal({ ...customerModal, open: false });
+                loadData();
+            } else {
+                setFormError(res.error || "Error al guardar");
+            }
+        } catch (e) { setFormError("Error de conexión"); }
+        finally { setSaving(false); }
+    };
+
+    const openRegisterDetail = async (id: string) => {
+        try {
+            setIsDetailLoading(true);
+            const data = await getRegisterDetailsAction(id);
+            setRegisterDetailModal({ open: true, data });
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsDetailLoading(false);
+        }
+    };
+
     useEffect(() => {
         loadData();
+    }, [activeTab]); // Initial load and reload when activeTab changes
 
-        // Configuración de Supabase Realtime
+    // Reload sales when selectedDate changes
+    useEffect(() => {
+        if (activeTab === "ventas") {
+            loadData();
+        }
+    }, [selectedDate, activeTab]);
+
+    // Configuración de Supabase Realtime
+    useEffect(() => {
         const channel = supabase
             .channel('db-changes')
             .on(
@@ -274,7 +347,9 @@ export default function AdminClient() {
                         <AdminNavItem icon={<Users />} label="Pedidos Distribuidores" active={activeTab === "distribuidores"} onClick={() => switchTab("distribuidores")} />
                         <div className="hidden lg:block pt-2 pb-1"><p className="text-surface/20 text-[10px] font-black uppercase tracking-widest px-4">Operaciones</p></div>
                         <AdminNavItem icon={<Package />} label="Gestión de Productos" active={activeTab === "productos"} onClick={() => switchTab("productos")} />
+                        <AdminNavItem icon={<Scale />} label="Corte de Cajas" active={activeTab === "cortes"} onClick={() => switchTab("cortes")} />
                         <AdminNavItem icon={<ClipboardList />} label="Control de Inventario" active={activeTab === "inventario"} onClick={() => switchTab("inventario")} />
+                        <AdminNavItem icon={<Users />} label="Clientes" active={activeTab === "clientes"} onClick={() => switchTab("clientes")} />
                         <AdminNavItem icon={<UserCog />} label="Personal" active={activeTab === "usuarios"} onClick={() => switchTab("usuarios")} />
                     </nav>
                 </div>
@@ -335,23 +410,23 @@ export default function AdminClient() {
                             {/* Key Performance Indicators */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                                 <KpiCard
-                                    title="Ingresos Hoy"
-                                    value={formatCurrency(metrics.totalRevenue)}
-                                    icon={<TrendingUp className="w-6 h-6" />}
+                                    title="Efectivo Hoy"
+                                    value={formatCurrency(metrics.cashRevenue)}
+                                    icon={<Banknote className="w-6 h-6" />}
                                     color="bg-emerald-500"
                                     growth={metrics.growth}
+                                />
+                                <KpiCard
+                                    title="Crédito Hoy"
+                                    value={formatCurrency(metrics.creditRevenue)}
+                                    icon={<CreditCard className="w-6 h-6" />}
+                                    color="bg-amber-500"
                                 />
                                 <KpiCard
                                     title="Ventas Totales"
                                     value={metrics.totalOrders.toString()}
                                     icon={<ShoppingCart className="w-6 h-6" />}
                                     color="bg-blue-500"
-                                />
-                                <KpiCard
-                                    title="Distribuidores"
-                                    value={metrics.activeDistributors.toString()}
-                                    icon={<Users className="w-6 h-6" />}
-                                    color="bg-indigo-500"
                                 />
                                 <KpiCard
                                     title="Alertas Stock"
@@ -509,53 +584,116 @@ export default function AdminClient() {
                                         <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Auditoría completa de transacciones POS</p>
                                     </div>
                                 </div>
+                                <div className="flex flex-col gap-2 w-full md:w-auto">
+                                    <label className="text-[10px] font-black text-surface/30 uppercase tracking-widest pl-2">Filtrar por Fecha</label>
+                                    <div className="relative group/date">
+                                        <input
+                                            type="date"
+                                            value={selectedDate}
+                                            title="Seleccionar fecha de consulta"
+                                            placeholder="AAAA-MM-DD"
+                                            onChange={(e) => {
+                                                setSelectedDate(e.target.value);
+                                            }}
+                                            className="bg-secondary/60 border border-white/10 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest outline-none focus:border-primary/40 transition-all cursor-pointer appearance-none w-full md:w-64"
+                                        />
+                                        <Calendar className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4">
-                                {secondaryData?.map((sale: any) => (
-                                    <div key={sale.id} className="bg-secondary/40 backdrop-blur-3xl p-6 md:p-10 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-primary/20 transition-all shadow-xl">
-                                        <div className="flex items-center gap-8 flex-1">
-                                            <div className="w-20 h-20 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center shadow-xl border border-emerald-500/10 transform group-hover:rotate-12 group-hover:scale-105 transition-all duration-500 text-emerald-400">
-                                                <History className="w-10 h-10" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-4 mb-3">
-                                                    <span className="font-mono text-[10px] font-black text-surface/20 uppercase tracking-tighter bg-white/5 px-3 py-1 rounded-lg border border-white/5">#{sale.id.slice(-8).toUpperCase()}</span>
-                                                    <div className="px-4 py-1.5 bg-primary text-secondary rounded-full text-[9px] font-black uppercase tracking-[0.1em] shadow-lg shadow-primary/10 italic">VENTA POS</div>
-                                                </div>
-                                                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-12">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-xl font-black text-white group-hover:text-primary transition-colors">{sale.user?.name || "Sistema"}</span>
-                                                        <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em] mt-1">{new Date(sale.createdAt).toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="text-2xl font-black text-emerald-400 tabular-nums tracking-tighter">{formatCurrency(sale.totalAmount)}</span>
-                                                        <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em] mt-1">{sale.saleItems?.length} Productos Registrados</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-4 w-full md:w-auto">
-                                            <button
-                                                onClick={() => setSaleDetailModal({ open: true, data: sale })}
-                                                className="flex-1 md:flex-none h-16 px-8 bg-white/5 hover:bg-white/10 text-white rounded-2xl transition-all border border-white/5 flex items-center justify-center gap-4 group/btn shadow-xl"
-                                                title="Ver Detalles"
-                                            >
-                                                <Eye className="w-5 h-5 transition-transform group-hover/btn:scale-110" />
-                                                <span className="font-black text-[10px] uppercase tracking-widest leading-none">Auditar</span>
-                                            </button>
-                                            <button
-                                                onClick={() => generateTicketPDF(sale.saleItems.map((si: any) => ({ ...si, name: si.product?.name || "Producto", priceAtTime: si.unitPrice })), sale.totalAmount)}
-                                                className="flex-1 md:flex-none h-16 px-8 bg-primary text-secondary rounded-2xl transition-all border border-primary/20 flex items-center justify-center gap-4 hover:scale-105 active:scale-95 shadow-xl shadow-primary/10 group/print"
-                                                title="Reimprimir Ticket"
-                                            >
-                                                <Printer className="w-5 h-5 transition-transform group-hover/print:scale-110" />
-                                                <span className="font-black text-[10px] uppercase tracking-widest leading-none">Ticket</span>
-                                            </button>
-                                        </div>
+                            <div className="space-y-16">
+                                <div className="space-y-8">
+                                    <div className="flex items-center gap-6 px-6">
+                                        <div className="h-[1px] flex-1 bg-white/5" />
+                                        <h3 className="text-[10px] font-black text-primary uppercase tracking-[0.5em] italic bg-white/5 px-6 py-2 rounded-full border border-white/5 shadow-xl">
+                                            {selectedDate === new Date().toISOString().split('T')[0] ? "HOY" : new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                        </h3>
+                                        <div className="h-[1px] flex-1 bg-white/5" />
                                     </div>
-                                ))}
+
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {secondaryData && secondaryData.slice(0, visibleSalesCount).map((sale: any) => (
+                                            <div key={sale.id} className="bg-secondary/40 backdrop-blur-3xl p-6 md:p-10 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-primary/20 transition-all shadow-xl">
+                                                <div className="flex items-center gap-8 flex-1 w-full">
+                                                    <div className="w-20 h-20 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center shadow-xl border border-emerald-500/10 transform group-hover:rotate-12 group-hover:scale-105 transition-all duration-500 text-emerald-400 shrink-0">
+                                                        <History className="w-10 h-10" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-4 mb-3 flex-wrap">
+                                                            <span className="font-mono text-[10px] font-black text-surface/20 uppercase tracking-tighter bg-white/5 px-3 py-1 rounded-lg border border-white/5">#{sale.id.slice(-8).toUpperCase()}</span>
+                                                            <div className="px-4 py-1.5 bg-primary text-secondary rounded-full text-[9px] font-black uppercase tracking-[0.1em] shadow-lg shadow-primary/10 italic">VENTA POS</div>
+                                                        </div>
+                                                        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-12">
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="text-xl font-black text-white group-hover:text-primary transition-colors flex items-center gap-2 truncate">
+                                                                    {sale.user?.name || "Sistema"}
+                                                                    {sale.customer && (
+                                                                        <span className="text-[10px] bg-white/10 px-3 py-1 rounded-lg text-surface/30 truncate max-w-[120px]">
+                                                                            PARA: {sale.customer.name.toUpperCase()}
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                                <div className="flex items-center gap-3 mt-1">
+                                                                    <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em]">{new Date(sale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    {sale.isCredit && (
+                                                                        <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/10">
+                                                                            <CreditCard className="w-3 h-3" /> FÍADO
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-col shrink-0">
+                                                                <span className="text-2xl font-black text-emerald-400 tabular-nums tracking-tighter">{formatCurrency(sale.totalAmount)}</span>
+                                                                <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em] mt-1">{sale.saleItems?.length} Productos</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-4 w-full md:w-auto">
+                                                    <button
+                                                        onClick={() => setSaleDetailModal({ open: true, data: sale })}
+                                                        className="flex-1 md:flex-none h-16 px-8 bg-white/5 hover:bg-white/10 text-white rounded-2xl transition-all border border-white/5 flex items-center justify-center gap-4 group/btn shadow-xl"
+                                                        title="Ver Detalles"
+                                                    >
+                                                        <Eye className="w-5 h-5 transition-transform group-hover/btn:scale-110" />
+                                                        <span className="font-black text-[10px] uppercase tracking-widest leading-none">Auditar</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => generateTicketPDF(sale.saleItems.map((si: any) => ({ ...si, name: si.product?.name || "Producto", priceAtTime: si.unitPrice })), sale.totalAmount)}
+                                                        className="flex-1 md:flex-none h-16 px-8 bg-primary text-secondary rounded-2xl transition-all border border-primary/20 flex items-center justify-center gap-4 hover:scale-105 active:scale-95 shadow-xl shadow-primary/10 group/print"
+                                                        title="Reimprimir Ticket"
+                                                    >
+                                                        <Printer className="w-5 h-5 transition-transform group-hover/print:scale-110" />
+                                                        <span className="font-black text-[10px] uppercase tracking-widest leading-none">Ticket</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        {secondaryData && secondaryData.length === 0 && (
+                                            <div className="flex flex-col items-center justify-center py-20 bg-secondary/20 rounded-[3rem] border border-dashed border-white/10">
+                                                <Calendar className="w-16 h-16 text-surface/10 mb-6" />
+                                                <p className="text-[10px] font-black text-surface/30 uppercase tracking-[0.4em]">No hay ventas registradas este día</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {secondaryData && secondaryData.length > visibleSalesCount && (
+                                    <div className="flex justify-center pt-8">
+                                        <button
+                                            onClick={() => setVisibleSalesCount(prev => prev + 10)}
+                                            className="group relative overflow-hidden bg-white/5 text-primary px-16 py-6 rounded-[2.5rem] font-black border border-white/10 shadow-2xl transition-all hover:scale-105 active:scale-95"
+                                        >
+                                            <div className="absolute inset-0 bg-primary translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
+                                            <span className="relative flex items-center gap-4 text-xs uppercase tracking-[0.3em] group-hover:text-secondary transition-colors">
+                                                Cargar más del día <Plus className="w-5 h-5" />
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -944,6 +1082,95 @@ export default function AdminClient() {
                         </div>
                     )}
 
+                    {activeTab === "clientes" && (
+                        <div className="space-y-12">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 px-6">
+                                <div>
+                                    <h2 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter leading-none">Gestión de <span className="text-primary italic">Clientes</span></h2>
+                                    <div className="flex items-center gap-3 mt-4">
+                                        <div className="h-[1px] w-8 bg-primary/40" />
+                                        <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Cartera de clientes y control de fiado</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={openNewCustomer}
+                                    className="group relative overflow-hidden bg-primary text-secondary px-10 py-5 rounded-2xl font-black shadow-2xl transition-all hover:scale-105 active:scale-95 shadow-primary/20"
+                                >
+                                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform" />
+                                    <span className="relative flex items-center gap-3 text-[11px] uppercase tracking-widest">
+                                        <Users className="w-6 h-6 border-2 border-secondary/20 rounded-lg p-0.5" /> Nuevo Cliente
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {secondaryData?.map((c: any) => (
+                                    <div key={c.id} className="bg-secondary/40 backdrop-blur-3xl p-8 rounded-[3rem] border border-white/5 group hover:border-primary/20 transition-all shadow-2xl relative overflow-hidden flex flex-col">
+                                        <div className="flex justify-between items-start mb-8">
+                                            <div className={cn(
+                                                "w-16 h-16 rounded-2xl shadow-xl flex items-center justify-center transform group-hover:scale-110 transition-all duration-500",
+                                                c.active ? "bg-primary text-secondary" : "bg-white/5 text-surface/20"
+                                            )}>
+                                                <User className="w-8 h-8" />
+                                            </div>
+                                            <button
+                                                onClick={() => toggleCustomerActiveAction(c.id, !c.active).then(loadData)}
+                                                title={c.active ? "Desactivar Cliente" : "Activar Cliente"}
+                                                className={cn(
+                                                    "w-14 h-7 rounded-full relative transition-all duration-500",
+                                                    c.active ? "bg-emerald-500/20" : "bg-white/10"
+                                                )}
+                                            >
+                                                <motion.div
+                                                    animate={{ x: c.active ? 32 : 4 }}
+                                                    className={cn("w-5 h-5 rounded-full absolute top-1 shadow-lg", c.active ? "bg-emerald-400" : "bg-surface/20")}
+                                                />
+                                            </button>
+                                        </div>
+
+                                        <h4 className="text-2xl font-black text-white mb-2 group-hover:text-primary transition-colors tracking-tight uppercase leading-tight truncate">{c.name}</h4>
+                                        <div className="flex items-center gap-3 mb-8">
+                                            <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em]">{c.phone || "SIN TELÉFONO"}</span>
+                                            <div className="w-1 h-1 bg-white/10 rounded-full" />
+                                            <span className={cn(
+                                                "text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full",
+                                                c.active ? "text-emerald-400 bg-emerald-500/5" : "text-surface/20 bg-white/5"
+                                            )}>{c.active ? "CLIENTE ACTIVO" : "SUSPENDIDO"}</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 mb-8">
+                                            <div className="bg-white/5 p-5 rounded-[2rem] border border-white/5">
+                                                <p className="text-[9px] font-black text-surface/30 uppercase mb-2 tracking-widest text-center">Saldo Deudor</p>
+                                                <p className={cn(
+                                                    "text-xl font-black text-center tracking-tighter tabular-nums",
+                                                    c.currentDebt > 0 ? "text-accent" : "text-white/40"
+                                                )}>{formatCurrency(c.currentDebt)}</p>
+                                            </div>
+                                            <div className="bg-primary/5 p-5 rounded-[2rem] border border-primary/10">
+                                                <p className="text-[9px] font-black text-primary/40 uppercase mb-2 tracking-widest text-center">Límite</p>
+                                                <p className="text-xl font-black text-primary text-center tracking-tighter tabular-nums">{formatCurrency(c.creditLimit)}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-auto flex items-center justify-between pt-8 border-t border-white/5">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] font-black text-surface/20 uppercase tracking-widest leading-none mb-1">Dirección</span>
+                                                <span className="text-[10px] font-black text-white/40 truncate max-w-[150px]">{c.address || "NO REGISTRADA"}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => openEditCustomer(c)}
+                                                className="w-14 h-14 bg-white/5 hover:bg-primary hover:text-secondary rounded-2xl transition-all flex items-center justify-center border border-white/5 group/edit shadow-xl"
+                                                title="Editar Cliente"
+                                            >
+                                                <Pencil className="w-6 h-6 transition-transform group-hover/edit:scale-110" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === "cortes" && (
                         <div className="space-y-12">
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 px-6">
@@ -966,38 +1193,85 @@ export default function AdminClient() {
                                         <thead>
                                             <tr className="border-b border-white/5">
                                                 <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Cajero</th>
-                                                <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Apertura</th>
-                                                <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Cierre</th>
+                                                <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Inicio / Duración</th>
                                                 <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Fondo Inicial</th>
-                                                <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Corte Final</th>
+                                                <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Venta Neta</th>
                                                 <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Diferencia</th>
+                                                <th className="p-10 text-[10px] font-black text-surface/20 uppercase tracking-[0.4em]">Corte Real</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5">
-                                            {secondaryData?.map((r: any) => (
-                                                <tr key={r.id} className="group hover:bg-white/5 transition-colors">
-                                                    <td className="p-10">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                                                                <User className="w-6 h-6" />
+                                            {secondaryData?.map((r: any) => {
+                                                const duration = r.closedAt
+                                                    ? (() => {
+                                                        const diff = new Date(r.closedAt).getTime() - new Date(r.openedAt).getTime();
+                                                        const hours = Math.floor(diff / (1000 * 60 * 60));
+                                                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                                        return `${hours}h ${minutes}m`;
+                                                    })()
+                                                    : "Activo";
+
+                                                const netSales = r.closingAmount ? (r.expectedAmount - r.openingAmount) : 0;
+
+                                                return (
+                                                    <tr
+                                                        key={r.id}
+                                                        className="group hover:bg-white/5 transition-colors cursor-pointer"
+                                                        onClick={() => openRegisterDetail(r.id)}
+                                                    >
+                                                        <td className="p-10">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                                                    <User className="w-6 h-6" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors">{r.openedBy.name}</p>
+                                                                    <p className="text-[9px] text-surface/20 font-mono tracking-tighter uppercase mt-1">{r.openedBy.email}</p>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <p className="font-black text-white uppercase tracking-tight group-hover:text-primary transition-colors">{r.openedBy.name}</p>
-                                                                <p className="text-[9px] text-surface/20 font-mono tracking-tighter uppercase mt-1">{r.openedBy.email}</p>
+                                                        </td>
+                                                        <td className="p-10">
+                                                            <p className="text-[11px] text-white font-black uppercase tracking-widest mb-1">{new Date(r.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <Clock className="w-3 h-3 text-surface/20" />
+                                                                <span className="text-[9px] text-surface/20 font-black uppercase tracking-widest">{duration}</span>
                                                             </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-10 text-[11px] text-surface/30 font-black uppercase tracking-widest">{new Date(r.openedAt).toLocaleString()}</td>
-                                                    <td className="p-10 text-[11px] text-surface/30 font-black uppercase tracking-widest">
-                                                        {r.closedAt ? new Date(r.closedAt).toLocaleString() : <span className="text-accent animate-pulse">EN CURSO</span>}
-                                                    </td>
-                                                    <td className="p-10 font-black text-white tabular-nums tracking-tighter text-xl">{formatCurrency(r.openingAmount)}</td>
-                                                    <td className="p-10 font-black text-white tabular-nums tracking-tighter text-xl">{r.closingAmount ? formatCurrency(r.closingAmount) : "-"}</td>
-                                                    <td className="p-10 font-black text-emerald-400 tabular-nums tracking-tighter text-2xl">
-                                                        {r.closingAmount ? formatCurrency(r.closingAmount - r.openingAmount) : "-"}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                                        </td>
+                                                        <td className="p-10 font-black text-white tabular-nums tracking-tighter text-xl opacity-40">{formatCurrency(r.openingAmount)}</td>
+                                                        <td className="p-10 font-black text-white tabular-nums tracking-tighter text-xl">
+                                                            {r.closedAt ? formatCurrency(netSales) : "-"}
+                                                        </td>
+                                                        <td className={cn(
+                                                            "p-10 font-black tabular-nums tracking-tighter text-2xl",
+                                                            !r.closedAt ? "text-white/10" :
+                                                                r.discrepancyAmount === 0 ? "text-emerald-400" :
+                                                                    r.discrepancyAmount > 0 ? "text-blue-400" : "text-accent"
+                                                        )}>
+                                                            {r.closedAt ? (
+                                                                <div className="flex flex-col">
+                                                                    <span>{formatCurrency(r.discrepancyAmount)}</span>
+                                                                    <span className="text-[9px] uppercase tracking-widest opacity-40">
+                                                                        {r.discrepancyAmount === 0 ? "Exacto" : r.discrepancyAmount > 0 ? "Sobrante" : "Faltante"}
+                                                                    </span>
+                                                                </div>
+                                                            ) : "-"}
+                                                        </td>
+                                                        <td className="p-10">
+                                                            {r.closingAmount ? (
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-black text-white tabular-nums tracking-tighter text-2xl">{formatCurrency(r.closingAmount)}</span>
+                                                                    <span className="text-[9px] text-surface/20 font-black uppercase tracking-widest mt-1">Total en Caja</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2 text-accent animate-pulse">
+                                                                    <div className="w-2 h-2 bg-accent rounded-full" />
+                                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sesión Abierta</span>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1007,8 +1281,70 @@ export default function AdminClient() {
                 </div>
             </main>
 
-            {/* Modals Implementation (Product, User, Movement) */}
+            {/* Modals Implementation (Product, User, Customer, Movement) */}
             <AnimatePresence>
+                {customerModal.open && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-white">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-neutral-black/90 backdrop-blur-2xl" onClick={() => setCustomerModal({ ...customerModal, open: false })} />
+                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }} className="relative bg-[#1A1A1A] w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden border border-white/5 flex flex-col max-h-[90vh]">
+                            <div className="bg-secondary/40 p-10 relative overflow-hidden shrink-0">
+                                <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full -mr-32 -mt-32 blur-[100px] pointer-events-none opacity-20" />
+                                <div className="relative z-10 flex justify-between items-center">
+                                    <div>
+                                        <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none">{customerModal.editing ? "Perfil de" : "Nuevo"} <span className="text-primary">Cliente</span></h3>
+                                        <div className="flex items-center gap-3 mt-4">
+                                            <div className="h-[1px] w-8 bg-primary/40" />
+                                            <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Registro de cartera y límites de fiado</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setCustomerModal({ ...customerModal, open: false })} className="w-14 h-14 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-white flex items-center justify-center border border-white/5 shadow-xl" title="Cerrar"><X /></button>
+                                </div>
+                            </div>
+
+                            <div className="p-10 space-y-10 overflow-y-auto">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                                    <div className="col-span-2">
+                                        <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Nombre Completo</label>
+                                        <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={cForm.name} onChange={e => setCForm({ ...cForm, name: e.target.value })} placeholder="EJ: JUAN PÉREZ" title="Nombre" />
+                                    </div>
+                                    <div className="col-span-2 lg:col-span-1">
+                                        <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Teléfono de Contacto</label>
+                                        <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-base font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={cForm.phone} onChange={e => setCForm({ ...cForm, phone: e.target.value })} placeholder="55 1234 5678" title="Teléfono" />
+                                    </div>
+                                    <div className="col-span-2 lg:col-span-1">
+                                        <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Límite de Crédito</label>
+                                        <div className="relative">
+                                            <span className="absolute left-8 top-1/2 -translate-y-1/2 text-primary font-black">$</span>
+                                            <input type="number" className="w-full bg-white/5 border border-white/5 rounded-[2rem] pl-14 pr-8 py-5 text-xl font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all tabular-nums" value={cForm.creditLimit} onChange={e => setCForm({ ...cForm, creditLimit: Number(e.target.value) })} title="Límite" />
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Correo Electrónico (Opcional)</label>
+                                        <input type="email" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-base font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={cForm.email} onChange={e => setCForm({ ...cForm, email: e.target.value })} placeholder="CLIENTE@EJEMPLO.COM" title="Email" />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Dirección de Entrega</label>
+                                        <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={cForm.address} onChange={e => setCForm({ ...cForm, address: e.target.value })} placeholder="CALLE, NÚMERO, COLONIA" title="Dirección" />
+                                    </div>
+                                </div>
+
+                                {formError && <p className="text-accent text-[10px] font-black uppercase bg-accent/5 p-6 rounded-[2rem] text-center italic tracking-widest border border-accent/10">{formError}</p>}
+
+                                <button
+                                    onClick={handleSaveCustomer}
+                                    disabled={saving}
+                                    className="w-full bg-primary text-secondary py-6 rounded-[2.5rem] font-black text-sm tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:grayscale shrink-0 relative overflow-hidden"
+                                >
+                                    <div className="absolute inset-0 bg-white/20 translate-y-full hover:translate-y-0 transition-transform" />
+                                    <span className="relative flex items-center justify-center gap-3">
+                                        {saving ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : (customerModal.editing ? "ACTUALIZAR DATOS" : "REGISTRAR CLIENTE")}
+                                    </span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
                 {productModal.open && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-neutral-black/90 backdrop-blur-2xl" onClick={() => setProductModal({ ...productModal, open: false })} />
@@ -1276,6 +1612,171 @@ export default function AdminClient() {
                                     >
                                         <Printer className="w-6 h-6" /> REIMPRIMIR TICKET
                                     </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
+                {registerDetailModal.open && registerDetailModal.data && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 transition-all duration-300">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-neutral-black/90 backdrop-blur-2xl" onClick={() => setRegisterDetailModal({ open: false, data: null })} />
+                        <motion.div initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }} className="relative bg-[#1A1A1A] w-full max-w-4xl rounded-[4rem] shadow-2xl overflow-hidden border border-white/5 flex flex-col max-h-[90vh]">
+                            <div className="bg-secondary/40 p-10 relative overflow-hidden shrink-0 border-b border-white/5">
+                                <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full -mr-32 -mt-32 blur-[100px] pointer-events-none opacity-20" />
+                                <div className="relative z-10 flex justify-between items-center text-white">
+                                    <div>
+                                        <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Auditoría de <span className="text-primary italic">Turno</span></h3>
+                                        <div className="flex items-center gap-3 mt-4">
+                                            <div className="h-[1px] w-8 bg-primary/40" />
+                                            <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Cajero: {registerDetailModal.data.register.openedBy?.name}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={() => {
+                                                setSaving(true);
+                                                const toast = document.createElement('div');
+                                                toast.className = "fixed bottom-10 left-1/2 -translate-x-1/2 bg-primary text-secondary px-10 py-5 rounded-2xl font-black shadow-2xl z-[200] animate-bounce text-[11px] uppercase tracking-[0.3em]";
+                                                toast.innerText = "Sincronizando y Generando PDF...";
+                                                document.body.appendChild(toast);
+                                                setTimeout(() => {
+                                                    setSaving(false);
+                                                    toast.innerText = "REPORTE DESCARGADO CON ÉXITO";
+                                                    setTimeout(() => toast.remove(), 2500);
+                                                }, 2000);
+                                            }}
+                                            className="h-14 px-8 bg-primary text-secondary rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-primary/20 flex items-center gap-3 disabled:opacity-50"
+                                            disabled={saving}
+                                        >
+                                            <Printer className="w-5 h-5" /> {saving ? "GENERANDO..." : "REPORTE PDF"}
+                                        </button>
+                                        <button onClick={() => setRegisterDetailModal({ open: false, data: null })} className="w-14 h-14 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-white flex items-center justify-center border border-white/5 shadow-xl" title="Cerrar"><X /></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar text-white bg-gradient-to-b from-transparent to-black/20">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-primary/20 transition-all">
+                                        <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Ventas Netas</p>
+                                        <p className="text-3xl font-black text-white tabular-nums tracking-tighter">{formatCurrency(registerDetailModal.data.sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0))}</p>
+                                    </div>
+                                    <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-accent/20 transition-all">
+                                        <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Total Gastos</p>
+                                        <p className="text-3xl font-black text-accent tabular-nums tracking-tighter">{formatCurrency(registerDetailModal.data.expenses.reduce((acc: number, e: any) => acc + e.amount, 0))}</p>
+                                    </div>
+                                    <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-emerald-500/20 transition-all">
+                                        <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Corte Real</p>
+                                        <p className="text-3xl font-black text-emerald-400 tabular-nums tracking-tighter">{formatCurrency(registerDetailModal.data.register.closingAmount || 0)}</p>
+                                    </div>
+                                    <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-blue-500/20 transition-all">
+                                        <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Diferencia</p>
+                                        <p className={cn("text-3xl font-black tabular-nums tracking-tighter", registerDetailModal.data.register.discrepancyAmount >= 0 ? "text-blue-400" : "text-accent")}>
+                                            {formatCurrency(registerDetailModal.data.register.discrepancyAmount || 0)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-16 py-6">
+                                    <section>
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary"><ShoppingCart className="w-5 h-5" /></div>
+                                            <h4 className="text-2xl font-black text-white uppercase tracking-tight italic">Desglose de Ventas</h4>
+                                        </div>
+                                        <div className="bg-white/[0.02] rounded-[3rem] border border-white/5 overflow-hidden">
+                                            <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                                                {registerDetailModal.data.sales.length > 0 ? (
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead className="bg-white/5">
+                                                            <tr>
+                                                                <th className="px-8 py-5 text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Cliente / Detalle</th>
+                                                                <th className="px-8 py-5 text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Método</th>
+                                                                <th className="px-8 py-5 text-right text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Monto</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-white/5">
+                                                            {registerDetailModal.data.sales.map((s: any) => (
+                                                                <tr key={s.id} className="hover:bg-white/5 transition-colors">
+                                                                    <td className="px-8 py-5">
+                                                                        <p className="font-black text-white text-sm uppercase tracking-tight">{s.customerName || "Mostrador / Público General"}</p>
+                                                                        <p className="text-[9px] text-surface/20 uppercase mt-1 tracking-widest leading-none">{new Date(s.createdAt).toLocaleTimeString()}</p>
+                                                                    </td>
+                                                                    <td className="px-8 py-5">
+                                                                        <span className="text-[9px] font-black px-3 py-1 rounded-full bg-white/5 text-surface/30 uppercase tracking-widest">{s.paymentMethod}</span>
+                                                                    </td>
+                                                                    <td className="px-8 py-5 text-right font-black text-white text-lg tabular-nums">
+                                                                        {formatCurrency(s.totalAmount)}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                ) : <p className="p-16 text-center text-surface/10 text-xs font-black uppercase tracking-[0.3em] italic">Sin ventas en este periodo</p>}
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                        <section>
+                                            <div className="flex items-center gap-4 mb-8">
+                                                <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400"><TrendingUp className="w-5 h-5" /></div>
+                                                <h4 className="text-2xl font-black text-white uppercase tracking-tight italic">Entradas Manuales</h4>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {registerDetailModal.data.inflows.map((i: any) => (
+                                                    <div key={i.id} className="bg-emerald-500/5 p-6 rounded-2xl flex justify-between items-center border border-emerald-500/10 border-dashed hover:bg-emerald-500/10 transition-all">
+                                                        <div>
+                                                            <p className="font-black text-white text-sm uppercase tracking-tight">{i.description}</p>
+                                                            <p className="text-[9px] text-emerald-400/40 mt-1 uppercase leading-none">{new Date(i.createdAt).toLocaleTimeString()}</p>
+                                                        </div>
+                                                        <p className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(i.amount)}</p>
+                                                    </div>
+                                                ))}
+                                                {registerDetailModal.data.inflows.length === 0 && <div className="p-12 border border-white/5 border-dashed rounded-[2rem] text-center text-surface/10 text-[10px] uppercase font-black tracking-widest italic">Vacío</div>}
+                                            </div>
+                                        </section>
+                                        <section>
+                                            <div className="flex items-center gap-4 mb-8">
+                                                <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-accent"><TrendingDown className="w-5 h-5" /></div>
+                                                <h4 className="text-2xl font-black text-white uppercase tracking-tight italic">Gastos Registrados</h4>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {registerDetailModal.data.expenses.map((e: any) => (
+                                                    <div key={e.id} className="bg-red-500/5 p-6 rounded-2xl flex justify-between items-center border border-red-500/10 border-dashed hover:bg-red-500/10 transition-all">
+                                                        <div>
+                                                            <p className="font-black text-white text-sm uppercase tracking-tight">{e.concept}</p>
+                                                            <p className="text-[9px] text-red-400/40 mt-1 uppercase leading-none">{new Date(e.createdAt).toLocaleTimeString()}</p>
+                                                        </div>
+                                                        <p className="text-xl font-black text-accent tabular-nums">-{formatCurrency(e.amount)}</p>
+                                                    </div>
+                                                ))}
+                                                {registerDetailModal.data.expenses.length === 0 && <div className="p-12 border border-white/5 border-dashed rounded-[2rem] text-center text-surface/10 text-[10px] uppercase font-black tracking-widest italic">Vacío</div>}
+                                            </div>
+                                        </section>
+                                    </div>
+
+                                    <section>
+                                        <div className="flex items-center gap-4 mb-8">
+                                            <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-400"><CreditCard className="w-5 h-5" /></div>
+                                            <h4 className="text-2xl font-black text-white uppercase tracking-tight italic">Abonos a Créditos</h4>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            {registerDetailModal.data.abonos.map((a: any) => (
+                                                <div key={a.id} className="bg-blue-500/5 p-8 rounded-[2.5rem] border border-blue-500/20 shadow-xl group hover:bg-blue-500/10 transition-all">
+                                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 ml-2">{a.customerName}</p>
+                                                    <div className="flex justify-between items-end">
+                                                        <div>
+                                                            <p className="text-2xl font-black text-white tabular-nums tracking-tighter">{formatCurrency(a.amount)}</p>
+                                                            <p className="text-[10px] text-surface/30 mt-1 uppercase italic tracking-tight">{a.description}</p>
+                                                        </div>
+                                                        <span className="text-[9px] font-mono text-surface/20 mb-1">{new Date(a.createdAt).toLocaleTimeString()}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {registerDetailModal.data.abonos.length === 0 && <div className="col-span-full py-16 text-center border border-white/5 border-dashed rounded-[3rem] text-surface/10 text-[10px] font-black uppercase tracking-[0.3em] italic">Sin abonos registrados</div>}
+                                        </div>
+                                    </section>
                                 </div>
                             </div>
                         </motion.div>

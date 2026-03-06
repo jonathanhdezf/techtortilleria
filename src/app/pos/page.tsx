@@ -43,7 +43,31 @@ export default async function POSPage() {
     }))
 
     // Fetch shift summary if register is open
-    let shiftSummary: { cashSales: number, cardSales: number, totalExpenses: number, expensesList: any[] } = { cashSales: 0, cardSales: 0, totalExpenses: 0, expensesList: [] }
+    let shiftSummary: {
+        cashSales: number,
+        cardSales: number,
+        totalAbonos: number,
+        abonosList: any[],
+        totalExpenses: number,
+        expensesList: any[],
+        totalManualInflows: number,
+        inflowsList: any[],
+        totalVentas: number,
+        ventaMasGrande: number,
+        productoEstrella: string
+    } = {
+        cashSales: 0,
+        cardSales: 0,
+        totalAbonos: 0,
+        abonosList: [],
+        totalExpenses: 0,
+        expensesList: [],
+        totalManualInflows: 0,
+        inflowsList: [],
+        totalVentas: 0,
+        ventaMasGrande: 0,
+        productoEstrella: 'Ninguno'
+    }
     if (openRegister) {
         const sales = await prisma.sale.findMany({
             where: {
@@ -59,11 +83,58 @@ export default async function POSPage() {
             orderBy: { createdAt: 'desc' }
         })
 
+        const abonosDetail = await prisma.$queryRaw<any[]>`
+            SELECT t.id, t.amount, t."createdAt", t.description, c.name as "customerName"
+            FROM credit_transactions t
+            JOIN customers c ON t."customerId" = c.id
+            WHERE t.type = 'abonos'
+            AND t."createdAt" >= ${openRegister.openedAt}
+            AND c."businessId" = ${dbUser.businessId}
+            ORDER BY t."createdAt" DESC
+        `
+
+        const inflowsDetail = await prisma.$queryRaw<any[]>`
+            SELECT id, amount, description, "createdAt"
+            FROM cash_inflows
+            WHERE "cashRegisterId" = ${openRegister.id}
+            ORDER BY "createdAt" DESC
+        `
+
+        const saleItems = await prisma.saleItem.findMany({
+            where: {
+                sale: {
+                    userId: dbUser.id,
+                    createdAt: { gte: openRegister.openedAt }
+                }
+            },
+            include: { product: true }
+        })
+
+        // Group by product to find star product
+        const productStats = saleItems.reduce((acc: any, item: any) => {
+            const name = item.product.name
+            acc[name] = (acc[name] || 0) + Number(item.quantity)
+            return acc
+        }, {})
+
+        const productoEstrella = Object.entries(productStats).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'Ninguno'
+        const cashSales = sales.filter(s => s.paymentMethod === 'efectivo').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0)
+        const cardSales = sales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0)
+        const totalAbonos = abonosDetail.reduce((acc: number, a: any) => acc + Number(a.amount), 0)
+        const totalManualInflows = inflowsDetail.reduce((acc: number, i: any) => acc + Number(i.amount), 0)
+
         shiftSummary = {
-            cashSales: sales.filter(s => s.paymentMethod === 'efectivo').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0),
-            cardSales: sales.filter(s => s.paymentMethod !== 'efectivo').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0),
+            cashSales,
+            cardSales,
+            totalAbonos,
+            abonosList: abonosDetail.map(a => ({ ...a, amount: Number(a.amount) })),
+            totalManualInflows,
+            inflowsList: inflowsDetail.map(i => ({ ...i, amount: Number(i.amount) })),
             totalExpenses: expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0),
-            expensesList: expenses.map((e: any) => ({ ...e, amount: Number(e.amount) }))
+            expensesList: expenses.map((e: any) => ({ ...e, amount: Number(e.amount) })),
+            totalVentas: cashSales + cardSales + totalAbonos + totalManualInflows,
+            ventaMasGrande: Math.max(0, ...sales.map(s => Number(s.totalAmount))),
+            productoEstrella
         }
     }
 
