@@ -135,3 +135,55 @@ export async function getSalesHistoryAction(businessId: string) {
         return [];
     }
 }
+
+export async function getDistributorOrderAction(orderId: string) {
+    try {
+        console.log("🔍 SERVER: Solicitando pedido:", orderId);
+        const order = await prisma.distributorOrder.findUnique({
+            where: { id: orderId },
+            include: {
+                distributor: true,
+                orderItems: {
+                    include: {
+                        product: true
+                    }
+                }
+            }
+        });
+
+        if (!order) {
+            console.log("⚠️ SERVER: No se encontró el pedido con ID:", orderId);
+            return { error: "No se encontró el pedido en la base de datos." };
+        }
+
+        console.log("✅ SERVER: Pedido encontrado con", order.orderItems.length, "artículos");
+
+        return {
+            ...order,
+            totalAmount: Number(order.totalAmount),
+            distributor: {
+                ...order.distributor,
+                creditLimit: Number(order.distributor.creditLimit || 0),
+            },
+            orderItems: order.orderItems.map((oi: any) => ({
+                ...oi,
+                unitPrice: Number(oi.unitPrice),
+                subtotal: Number(oi.subtotal),
+                quantity: Number(oi.quantity),
+                product: {
+                    ...oi.product,
+                    pricePublic: Number(oi.product.pricePublic),
+                    priceDistributor: Number(oi.product.priceDistributor),
+                    stockQuantity: Number(oi.product.stockQuantity),
+                    minimumStockAlert: Number(oi.product.minimumStockAlert),
+                    unitType: oi.product.unitType,
+                    name: oi.product.name,
+                    id: oi.product.id
+                }
+            }))
+        };
+    } catch (error: any) {
+        console.error("❌ SERVER: Error al obtener detalle de pedido:", error);
+        return { error: error.message || "Error desconocido en el servidor" };
+    }
+}

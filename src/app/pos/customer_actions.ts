@@ -88,3 +88,17 @@ export async function getCustomerStats(customerId: string) {
         }))
     }
 }
+export async function searchDistributors(query: string) {
+    const user = await getCurrentUser()
+    const distributors = await prisma.$queryRaw<any[]>`
+        SELECT * FROM distributors
+        WHERE "businessId" = ${user.businessId}
+        AND name ILIKE ${'%' + query + '%'}
+        AND active = true
+    `
+    return distributors.map(d => ({
+        ...d,
+        creditLimit: Number(d.creditLimit),
+        currentDebt: Number(d.currentDebt || 0)
+    }))
+}

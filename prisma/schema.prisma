@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,102 +9,87 @@ datasource db {
 }
 
 model Business {
-  id        String   @id @default(uuid())
-  name      String
-  logoUrl   String?
-  phone     String?
-  email     String?
-  address   String?
-  createdAt DateTime @default(now())
-
-  users              User[]
-  products           Product[]
-  sales              Sale[]
-  distributors       Distributor[]
-  distributorOrders  DistributorOrder[]
-  inventoryMovements InventoryMovement[]
-  cashRegisters      CashRegister[]
-  expenses           Expense[]
-  inflows            CashInflow[]
-  dailyMetrics       DailyMetric[]
-
-  // Nuevas configuraciones
-  volumeDiscountActive    Boolean @default(false)
-  volumeDiscountThreshold Decimal @default(5.0) @db.Decimal(10, 2)
-  volumeDiscountPercentage Decimal @default(5.0) @db.Decimal(10, 2)
-
-  // Phase 2: Dashboard & Supervisor
-  dailyGoal             Decimal @default(10000.0) @db.Decimal(10, 2)
-  supervisorPIN         String  @default("1234")
-
-  customers             Customer[]
+  id                       String              @id @default(uuid())
+  name                     String
+  logoUrl                  String?
+  phone                    String?
+  email                    String?
+  address                  String?
+  createdAt                DateTime            @default(now())
+  volumeDiscountActive     Boolean             @default(false)
+  volumeDiscountPercentage Decimal             @default(5.0) @db.Decimal(10, 2)
+  volumeDiscountThreshold  Decimal             @default(5.0) @db.Decimal(10, 2)
+  dailyGoal                Decimal             @default(10000.0) @db.Decimal(10, 2)
+  supervisorPIN            String              @default("1234")
+  inflows                  CashInflow[]
+  cashRegisters            CashRegister[]
+  customers                Customer[]
+  dailyMetrics             DailyMetric[]
+  distributorOrders        DistributorOrder[]
+  distributors             Distributor[]
+  expenses                 Expense[]
+  inventoryMovements       InventoryMovement[]
+  products                 Product[]
+  sales                    Sale[]
+  users                    User[]
 
   @@map("businesses")
 }
 
-enum Role {
-  ADMIN
-  CAJERO
-  DISTRIBUIDOR
-}
-
 model User {
-  id           String   @id @default(uuid())
+  id           String         @id @default(uuid())
   businessId   String
   name         String
-  email        String   @unique
+  email        String         @unique
   passwordHash String
-  role         Role     @default(CAJERO)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-
-  business      Business       @relation(fields: [businessId], references: [id])
-  sales         Sale[]
-  openedCash    CashRegister[] @relation("OpenedBy")
-  closedCash    CashRegister[] @relation("ClosedBy")
+  role         Role           @default(CAJERO)
+  active       Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  closedCash   CashRegister[] @relation("ClosedBy")
+  openedCash   CashRegister[] @relation("OpenedBy")
+  sales        Sale[]
+  business     Business       @relation(fields: [businessId], references: [id])
 
   @@map("users")
 }
 
 model Product {
-  id                 String   @id @default(uuid())
+  id                 String                 @id @default(uuid())
   businessId         String
   name               String
   description        String?
-  pricePublic        Decimal  @db.Decimal(10, 2)
-  priceDistributor   Decimal  @db.Decimal(10, 2)
-  unitType           String // "kg" | "pieza"
-  stockQuantity      Decimal  @db.Decimal(10, 2)
-  minimumStockAlert  Decimal  @db.Decimal(10, 2)
-  active             Boolean  @default(true)
+  pricePublic        Decimal                @db.Decimal(10, 2)
+  priceDistributor   Decimal                @db.Decimal(10, 2)
+  unitType           String
+  stockQuantity      Decimal                @db.Decimal(10, 2)
+  minimumStockAlert  Decimal                @db.Decimal(10, 2)
+  active             Boolean                @default(true)
   category           String?
-  createdAt          DateTime @default(now())
-
-  business           Business            @relation(fields: [businessId], references: [id])
-  saleItems          SaleItem[]
+  createdAt          DateTime               @default(now())
   orderItems         DistributorOrderItem[]
   inventoryMovements InventoryMovement[]
+  business           Business               @relation(fields: [businessId], references: [id])
+  saleItems          SaleItem[]
 
   @@index([businessId])
   @@map("products")
 }
 
 model Sale {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   businessId    String
   userId        String
-  totalAmount   Decimal  @db.Decimal(10, 2)
-  paymentMethod String // "efectivo" | "transferencia" | "tarjeta"
-  createdAt     DateTime @default(now())
-
-  business  Business   @relation(fields: [businessId], references: [id])
-  user      User       @relation(fields: [userId], references: [id])
-  saleItems SaleItem[]
-
-  // Phase 2: Credit
-  customerId String?
-  isCredit   Boolean @default(false)
-  customer   Customer? @relation(fields: [customerId], references: [id])
+  totalAmount   Decimal    @db.Decimal(10, 2)
+  paymentMethod String
+  createdAt     DateTime   @default(now())
+  customerId    String?
+  distributorId String?
+  isCredit      Boolean    @default(false)
+  saleItems     SaleItem[]
+  business      Business   @relation(fields: [businessId], references: [id])
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  distributor   Distributor? @relation(fields: [distributorId], references: [id])
+  user          User       @relation(fields: [userId], references: [id])
 
   @@index([businessId])
   @@index([createdAt])
@@ -115,75 +97,65 @@ model Sale {
 }
 
 model SaleItem {
-  id         String  @id @default(uuid())
-  saleId     String
-  productId  String
-  quantity   Decimal @db.Decimal(10, 2)
-  unitPrice  Decimal @db.Decimal(10, 2)
-  subtotal   Decimal @db.Decimal(10, 2)
-
-  sale    Sale    @relation(fields: [saleId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  id        String  @id @default(uuid())
+  saleId    String
+  productId String
+  quantity  Decimal @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  product   Product @relation(fields: [productId], references: [id])
+  sale      Sale    @relation(fields: [saleId], references: [id])
 
   @@map("sale_items")
 }
 
 model Distributor {
-  id         String   @id @default(uuid())
-  businessId String
-  name       String
+  id          String             @id @default(uuid())
+  businessId  String
+  name        String
   contactName String?
-  phone      String?
-  email      String?
-  address    String?
-  creditLimit Decimal  @db.Decimal(10, 2) @default(0)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
-  business Business           @relation(fields: [businessId], references: [id])
-  orders   DistributorOrder[]
+  phone       String?
+  email       String?
+  address     String?
+  creditLimit Decimal            @default(0) @db.Decimal(10, 2)
+  currentDebt Decimal            @default(0.0) @db.Decimal(10, 2)
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  orders      DistributorOrder[]
+  transactions CreditTransaction[]
+  sales       Sale[]
+  business    Business           @relation(fields: [businessId], references: [id])
 
   @@map("distributors")
 }
 
-enum OrderStatus {
-  PENDIENTE
-  APROBADO
-  EN_PREPARACION
-  EN_RUTA
-  ENTREGADO
-  CANCELADO
-}
-
 model DistributorOrder {
-  id            String      @id @default(uuid())
+  id            String                 @id @default(uuid())
   businessId    String
   distributorId String
-  status        OrderStatus @default(PENDIENTE)
-  isPaid        Boolean     @default(false)
-  paymentMethod String?     // "efectivo" | "transferencia" | "crédito"
-  totalAmount   Decimal     @db.Decimal(10, 2)
-  createdAt     DateTime    @default(now())
+  status        OrderStatus            @default(PENDIENTE)
+  totalAmount   Decimal                @db.Decimal(10, 2)
+  createdAt     DateTime               @default(now())
   deliveredAt   DateTime?
-
-  business    Business               @relation(fields: [businessId], references: [id])
-  distributor Distributor            @relation(fields: [distributorId], references: [id])
-  orderItems  DistributorOrderItem[]
+  isPaid        Boolean                @default(false)
+  paymentMethod String?
+  orderItems    DistributorOrderItem[]
+  business      Business               @relation(fields: [businessId], references: [id])
+  distributor   Distributor            @relation(fields: [distributorId], references: [id])
 
   @@index([status])
   @@map("distributor_orders")
 }
 
 model DistributorOrderItem {
-  id        String  @id @default(uuid())
+  id        String           @id @default(uuid())
   orderId   String
   productId String
-  quantity  Decimal @db.Decimal(10, 2)
-  unitPrice Decimal @db.Decimal(10, 2)
-  subtotal  Decimal @db.Decimal(10, 2)
-
-  order   DistributorOrder @relation(fields: [orderId], references: [id])
-  product Product          @relation(fields: [productId], references: [id])
+  quantity  Decimal          @db.Decimal(10, 2)
+  unitPrice Decimal          @db.Decimal(10, 2)
+  subtotal  Decimal          @db.Decimal(10, 2)
+  order     DistributorOrder @relation(fields: [orderId], references: [id])
+  product   Product          @relation(fields: [productId], references: [id])
 
   @@map("distributor_order_items")
 }
@@ -192,63 +164,59 @@ model InventoryMovement {
   id           String   @id @default(uuid())
   businessId   String
   productId    String
-  movementType String // "venta" | "distribuidor" | "ajuste" | "merma" | "entrada_produccion"
+  movementType String
   quantity     Decimal  @db.Decimal(10, 2)
   referenceId  String?
   createdAt    DateTime @default(now())
-
-  business Business @relation(fields: [businessId], references: [id])
-  product  Product  @relation(fields: [productId], references: [id])
+  business     Business @relation(fields: [businessId], references: [id])
+  product      Product  @relation(fields: [productId], references: [id])
 
   @@index([productId])
   @@map("inventory_movements")
 }
 
 model CashRegister {
-  id            String    @id @default(uuid())
-  businessId    String
-  openedById    String
-  closedById    String?
-  openingAmount Decimal   @db.Decimal(10, 2)
-  closingAmount Decimal?  @db.Decimal(10, 2)
-  expectedAmount Decimal? @db.Decimal(10, 2)
-  discrepancyAmount Decimal? @db.Decimal(10, 2)
-  openedAt      DateTime  @default(now())
-  closedAt      DateTime?
-
-  business Business @relation(fields: [businessId], references: [id])
-  openedBy User     @relation("OpenedBy", fields: [openedById], references: [id])
-  closedBy User?    @relation("ClosedBy", fields: [closedById], references: [id])
-  expenses Expense[]
-  inflows  CashInflow[]
+  id                String       @id @default(uuid())
+  businessId        String
+  openedById        String
+  closedById        String?
+  openingAmount     Decimal      @db.Decimal(10, 2)
+  closingAmount     Decimal?     @db.Decimal(10, 2)
+  openedAt          DateTime     @default(now())
+  closedAt          DateTime?
+  discrepancyAmount Decimal?     @db.Decimal(10, 2)
+  expectedAmount    Decimal?     @db.Decimal(10, 2)
+  inflows           CashInflow[]
+  business          Business     @relation(fields: [businessId], references: [id])
+  closedBy          User?        @relation("ClosedBy", fields: [closedById], references: [id])
+  openedBy          User         @relation("OpenedBy", fields: [openedById], references: [id])
+  expenses          Expense[]
 
   @@map("cash_registers")
 }
 
 model Expense {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   businessId     String
   cashRegisterId String
-  amount         Decimal  @db.Decimal(10, 2)
+  amount         Decimal      @db.Decimal(10, 2)
   description    String
-  createdAt      DateTime @default(now())
-
-  business     Business     @relation(fields: [businessId], references: [id])
-  cashRegister CashRegister @relation(fields: [cashRegisterId], references: [id])
+  createdAt      DateTime     @default(now())
+  business       Business     @relation(fields: [businessId], references: [id])
+  cashRegister   CashRegister @relation(fields: [cashRegisterId], references: [id])
 
   @@map("expenses")
 }
 
 model CashInflow {
-  id             String   @id @default(uuid())
+  id             String       @id @default(uuid())
   businessId     String
   cashRegisterId String
-  amount         Decimal  @db.Decimal(10, 2)
+  amount         Decimal      @db.Decimal(10, 2)
   description    String
-  createdAt      DateTime @default(now())
-
-  business     Business     @relation(fields: [businessId], references: [id])
-  cashRegister CashRegister @relation(fields: [cashRegisterId], references: [id])
+  createdAt      DateTime     @default(now())
+  business       Business     @relation(fields: [businessId], references: [id])
+  cashRegister   CashRegister @relation(fields: [cashRegisterId], references: [id])
 
   @@map("cash_inflows")
 }
@@ -261,41 +229,55 @@ model DailyMetric {
   totalOrders Int
   totalIncome Decimal  @db.Decimal(10, 2)
   createdAt   DateTime @default(now())
-
-  business Business @relation(fields: [businessId], references: [id])
+  business    Business @relation(fields: [businessId], references: [id])
 
   @@unique([businessId, date])
   @@map("daily_metrics")
 }
 
 model Customer {
-  id         String   @id @default(uuid())
-  businessId String
-  name       String
-  phone      String?
-  email      String?
-  address    String?
-  creditLimit Decimal @default(1000.0) @db.Decimal(10, 2)
-  currentDebt Decimal @default(0.0) @db.Decimal(10, 2)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
-  business     Business      @relation(fields: [businessId], references: [id])
-  sales        Sale[]
+  id           String              @id @default(uuid())
+  businessId   String
+  name         String
+  phone        String?
+  email        String?
+  address      String?
+  creditLimit  Decimal             @default(1000.0) @db.Decimal(10, 2)
+  currentDebt  Decimal             @default(0.0) @db.Decimal(10, 2)
+  active       Boolean             @default(true)
+  createdAt    DateTime            @default(now())
   transactions CreditTransaction[]
+  business     Business            @relation(fields: [businessId], references: [id])
+  sales        Sale[]
 
   @@map("customers")
 }
 
 model CreditTransaction {
-  id          String   @id @default(uuid())
-  customerId  String
-  amount      Decimal  @db.Decimal(10, 2)
-  type        String   // "cargos" | "abonos"
-  description String?
-  createdAt   DateTime @default(now())
-
-  customer    Customer @relation(fields: [customerId], references: [id])
+  id            String       @id @default(uuid())
+  customerId    String?
+  distributorId String?
+  amount        Decimal      @db.Decimal(10, 2)
+  type          String
+  description   String?
+  createdAt     DateTime     @default(now())
+  customer      Customer?    @relation(fields: [customerId], references: [id])
+  distributor   Distributor? @relation(fields: [distributorId], references: [id])
 
   @@map("credit_transactions")
+}
+
+enum Role {
+  ADMIN
+  CAJERO
+  DISTRIBUIDOR
+}
+
+enum OrderStatus {
+  PENDIENTE
+  APROBADO
+  EN_PREPARACION
+  EN_RUTA
+  ENTREGADO
+  CANCELADO
 }

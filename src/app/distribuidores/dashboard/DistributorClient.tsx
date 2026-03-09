@@ -371,7 +371,7 @@ export default function DistributorClient() {
                                             <div className={cn(
                                                 "w-20 h-20 rounded-[2.5rem] flex items-center justify-center shadow-2xl rotate-3 group-hover:rotate-0 transition-transform shadow-black/40",
                                                 order.status === "PENDIENTE" ? "bg-amber-500/10 text-amber-500" :
-                                                    order.status === "PROCESANDO" ? "bg-blue-500/10 text-blue-500" :
+                                                    order.status === "EN_PROCESO" ? "bg-blue-500/10 text-blue-500" :
                                                         "bg-emerald-500/10 text-emerald-500"
                                             )}>
                                                 <Clock className="w-10 h-10" />
@@ -390,11 +390,13 @@ export default function DistributorClient() {
                                             <span className={cn(
                                                 "px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl",
                                                 order.status === "PENDIENTE" ? "bg-amber-500 text-secondary" :
-                                                    order.status === "PROCESANDO" ? "bg-blue-500 text-white" :
+                                                    order.status === "EN_PROCESO" ? "bg-blue-500 text-white" :
                                                         order.status === "ENTREGADO" ? "bg-emerald-500 text-secondary" :
                                                             "bg-white/10 text-white"
                                             )}>
-                                                {order.status}
+                                                {order.status === "PENDIENTE" ? "Pendiente" :
+                                                    order.status === "EN_PROCESO" ? "En proceso" :
+                                                        order.status === "ENTREGADO" ? "Entregado" : order.status}
                                             </span>
                                         </div>
                                     </div>

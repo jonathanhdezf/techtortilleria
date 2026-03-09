@@ -64,7 +64,8 @@ export async function processSale(
     paymentMethod: string,
     totalAmount: number,
     customerId?: string,
-    isCredit: boolean = false
+    isCredit: boolean = false,
+    distributorId?: string
 ) {
     const user = await getCurrentUser()
 
@@ -74,8 +75,8 @@ export async function processSale(
 
         // 1. Create Sale
         await prisma.$executeRaw`
-            INSERT INTO sales (id, "businessId", "userId", "totalAmount", "paymentMethod", "customerId", "isCredit", "createdAt")
-            VALUES (${saleId}, ${user.businessId}, ${user.id}, ${totalAmount}, ${paymentMethod}, ${customerId || null}, ${isCredit}, ${new Date()})
+            INSERT INTO sales (id, "businessId", "userId", "totalAmount", "paymentMethod", "customerId", "distributorId", "isCredit", "createdAt")
+            VALUES (${saleId}, ${user.businessId}, ${user.id}, ${totalAmount}, ${paymentMethod}, ${customerId || null}, ${distributorId || null}, ${isCredit}, ${new Date()})
         `
 
         // 2. Incremental updates for items and stock
@@ -98,18 +99,31 @@ export async function processSale(
             `
         }
 
-        // 3. Update Customer Debt if Credit
-        if (isCredit && customerId) {
-            await prisma.$executeRaw`
-                UPDATE customers
-                SET "currentDebt" = "currentDebt" + ${totalAmount}
-                WHERE id = ${customerId}
-            `
+        // 3. Update Debt if Credit
+        if (isCredit) {
+            if (customerId) {
+                await prisma.$executeRaw`
+                    UPDATE customers
+                    SET "currentDebt" = "currentDebt" + ${totalAmount}
+                    WHERE id = ${customerId}
+                `
 
-            await prisma.$executeRaw`
-                INSERT INTO credit_transactions (id, "customerId", amount, type, description, "createdAt")
-                VALUES (${crypto.randomUUID()}, ${customerId}, ${totalAmount}, 'cargos', 'Venta a crédito', ${new Date()})
-            `
+                await prisma.$executeRaw`
+                    INSERT INTO credit_transactions (id, "customerId", amount, type, description, "createdAt")
+                    VALUES (${crypto.randomUUID()}, ${customerId}, ${totalAmount}, 'cargos', 'Venta a crédito', ${new Date()})
+                `
+            } else if (distributorId) {
+                await prisma.$executeRaw`
+                    UPDATE distributors
+                    SET "currentDebt" = "currentDebt" + ${totalAmount}
+                    WHERE id = ${distributorId}
+                `
+
+                await prisma.$executeRaw`
+                    INSERT INTO credit_transactions (id, "distributorId", amount, type, description, "createdAt")
+                    VALUES (${crypto.randomUUID()}, ${distributorId}, ${totalAmount}, 'cargos', 'Venta a crédito', ${new Date()})
+                `
+            }
         }
 
         revalidatePath('/pos')
@@ -180,5 +194,28 @@ export async function getBusinessSettings() {
         ...business,
         volumeDiscountThreshold: Number(business?.volumeDiscountThreshold || 5),
         volumeDiscountPercentage: Number(business?.volumeDiscountPercentage || 5)
+    }
+}
+
+export async function recordDistributorPayment(distributorId: string, amount: number, description: string) {
+    const user = await getCurrentUser()
+
+    try {
+        await prisma.$executeRaw`
+            UPDATE distributors
+            SET "currentDebt" = "currentDebt" - ${amount}
+            WHERE id = ${distributorId}
+        `
+
+        await prisma.$executeRaw`
+            INSERT INTO credit_transactions (id, "distributorId", amount, type, description, "createdAt")
+            VALUES (${crypto.randomUUID()}, ${distributorId}, ${amount}, 'abonos', ${description || 'Abono de distribuidor'}, ${new Date()})
+        `
+
+        revalidatePath('/pos')
+        return { success: true }
+    } catch (error) {
+        console.error("Distributor Payment Error:", error)
+        throw error
     }
 }

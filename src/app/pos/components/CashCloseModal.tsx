@@ -17,6 +17,7 @@ interface CashCloseModalProps {
 
 export default function CashCloseModal({ isOpen, onClose, registerData }: CashCloseModalProps) {
     const [amount, setAmount] = useState('')
+    const [isSuccess, setIsSuccess] = useState(false)
     const [loading, setLoading] = useState(false)
 
     useModalAccessibility(isOpen, onClose)
@@ -37,16 +38,16 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
         } catch (error) {
             console.error('Error closing register:', error)
             alert('Error al cerrar la caja')
-        } finally {
             setLoading(false)
         }
 
         if (success) {
-            // Logout after closing the register to allow a different user to log in
-            // Move outside try-catch because redirect() throws an internal exception
-            const { logoutAction } = await import('@/app/actions/auth')
-            onClose()
-            await logoutAction()
+            setIsSuccess(true)
+            // Logout after 3 seconds to show the thank you message
+            setTimeout(async () => {
+                const { logoutAction } = await import('@/app/actions/auth')
+                await logoutAction()
+            }, 3000)
         }
     }
 
@@ -80,142 +81,170 @@ export default function CashCloseModal({ isOpen, onClose, registerData }: CashCl
                     <div className="absolute bottom-0 right-0 w-48 h-48 bg-primary/5 blur-[80px] rounded-full -mr-24 -mb-24 pointer-events-none" />
 
                     <div className="relative z-10">
-                        <div className="flex justify-between items-start mb-12">
-                            <div>
-                                <p className="text-[10px] font-black text-primary uppercase tracking-[0.5em] mb-4">Finalizando Turno Operativo</p>
-                                <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Corte de <span className="text-primary">Caja</span></h2>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                title="Cerrar modal"
-                                aria-label="Cerrar modal"
-                                className="p-4 bg-white/5 rounded-2xl text-white/20 hover:text-white transition-colors"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                            {/* Stats Card */}
-                            <div className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8">
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-                                        <TrendingUp className="w-5 h-5" />
+                        <AnimatePresence mode="wait">
+                            {isSuccess ? (
+                                <motion.div
+                                    key="success"
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="flex flex-col items-center justify-center py-20 text-center"
+                                >
+                                    <div className="w-24 h-24 bg-emerald-500/20 rounded-[3rem] flex items-center justify-center mb-8 border border-emerald-500/20">
+                                        <CheckCircle className="w-12 h-12 text-emerald-400" />
                                     </div>
-                                    <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Resumen de Turno</span>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Base de Caja</span>
-                                        <span className="text-xl font-black text-white tabular-nums">{formatCurrency(registerData?.openingAmount || 0)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Ventas Efectivo (+)</span>
-                                        <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.cashSales || 0)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Abonos Clientes (+)</span>
-                                        <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.totalAbonos || 0)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest text-emerald-400/80">Entradas Manuales (+)</span>
-                                        <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.totalManualInflows || 0)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center px-2">
-                                        <span className="text-xs font-bold text-white/20 uppercase tracking-widest text-red-400/80">Gastos Caja (-)</span>
-                                        <span className="text-xl font-black text-red-400 tabular-nums">{formatCurrency(registerData?.totalExpenses || 0)}</span>
-                                    </div>
-                                    <div className="h-px bg-white/5 w-full" />
-                                    <div className="flex justify-between items-center px-2 bg-primary/5 py-4 rounded-2xl border border-primary/10">
-                                        <span className="text-xs font-bold text-primary uppercase tracking-widest">Total Esperado</span>
-                                        <span className="text-2xl font-black text-primary tabular-nums">
-                                            {formatCurrency(expectedTotal)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center px-2 mt-4 opacity-40">
-                                        <span className="text-[10px] font-bold text-white uppercase tracking-widest">Ventas Tarjeta (No Suma)</span>
-                                        <span className="text-sm font-black text-white tabular-nums">{formatCurrency(registerData?.cardSales || 0)}</span>
-                                    </div>
-                                </div>
-                            </div>
+                                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.5em] mb-4">Proceso Finalizado</p>
+                                    <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-6">
+                                        Corte concluido <span className="text-emerald-400">exitosamente</span>
+                                    </h2>
+                                    <p className="text-white/40 font-bold uppercase tracking-widest text-[10px] max-w-sm leading-relaxed">
+                                        Gracias por tu jornada laboral. El sistema cerrará la sesión automáticamente en unos segundos.
+                                    </p>
 
-                            {/* Closing Input */}
-                            <div className="flex flex-col justify-center">
-                                <form onSubmit={handleClose} className="space-y-6">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-4 ml-6" htmlFor="amount">
-                                            Efectivo Real en Caja (MXN)
-                                        </label>
-                                        <div className="relative">
-                                            <div className="absolute left-8 top-1/2 -translate-y-1/2 text-primary font-black text-3xl italic pointer-events-none">$</div>
-                                            <input
-                                                id="amount"
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                required
-                                                autoFocus
-                                                value={amount}
-                                                onChange={(e) => setAmount(e.target.value)}
-                                                className="block w-full pl-16 pr-8 py-8 bg-white/5 border border-white/5 rounded-[2.5rem] font-black text-4xl tabular-nums text-white placeholder-white/5 focus:outline-none focus:bg-white/10 focus:border-primary/30 transition-all shadow-inner"
-                                                placeholder="0.00"
-                                            />
+                                    <div className="mt-12 flex items-center gap-3">
+                                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0s]" />
+                                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                        <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                    <div className="flex justify-between items-start mb-12">
+                                        <div>
+                                            <p className="text-[10px] font-black text-primary uppercase tracking-[0.5em] mb-4">Finalizando Turno Operativo</p>
+                                            <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter">Corte de <span className="text-primary">Caja</span></h2>
+                                        </div>
+                                        <button
+                                            onClick={onClose}
+                                            title="Cerrar modal"
+                                            className="p-4 bg-white/5 rounded-2xl text-white/20 hover:text-white transition-colors"
+                                        >
+                                            <X className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                                        {/* Stats Card */}
+                                        <div className="bg-white/5 border border-white/5 rounded-[2.5rem] p-8">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                                                    <TrendingUp className="w-5 h-5" />
+                                                </div>
+                                                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Resumen de Turno</span>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center px-2">
+                                                    <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Base de Caja</span>
+                                                    <span className="text-xl font-black text-white tabular-nums">{formatCurrency(registerData?.openingAmount || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center px-2">
+                                                    <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Ventas Efectivo (+)</span>
+                                                    <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.cashSales || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center px-2">
+                                                    <span className="text-xs font-bold text-white/20 uppercase tracking-widest">Abonos Clientes (+)</span>
+                                                    <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.totalAbonos || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center px-2">
+                                                    <span className="text-xs font-bold text-white/20 uppercase tracking-widest text-emerald-400/80">Entradas Manuales (+)</span>
+                                                    <span className="text-xl font-black text-emerald-400 tabular-nums">{formatCurrency(registerData?.totalManualInflows || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center px-2">
+                                                    <span className="text-xs font-bold text-white/20 uppercase tracking-widest text-red-400/80">Gastos Caja (-)</span>
+                                                    <span className="text-xl font-black text-red-400 tabular-nums">{formatCurrency(registerData?.totalExpenses || 0)}</span>
+                                                </div>
+                                                <div className="h-px bg-white/5 w-full" />
+                                                <div className="flex justify-between items-center px-2 bg-primary/5 py-4 rounded-2xl border border-primary/10">
+                                                    <span className="text-xs font-bold text-primary uppercase tracking-widest">Total Esperado</span>
+                                                    <span className="text-2xl font-black text-primary tabular-nums">
+                                                        {formatCurrency(expectedTotal)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center px-2 mt-4 opacity-40">
+                                                    <span className="text-[10px] font-bold text-white uppercase tracking-widest">Ventas Tarjeta (No Suma)</span>
+                                                    <span className="text-sm font-black text-white tabular-nums">{formatCurrency(registerData?.cardSales || 0)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Closing Input */}
+                                        <div className="flex flex-col justify-center">
+                                            <form onSubmit={handleClose} className="space-y-6">
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-4 ml-6" htmlFor="amount">
+                                                        Efectivo Real en Caja (MXN)
+                                                    </label>
+                                                    <div className="relative">
+                                                        <div className="absolute left-8 top-1/2 -translate-y-1/2 text-primary font-black text-3xl italic pointer-events-none">$</div>
+                                                        <input
+                                                            id="amount"
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            required
+                                                            autoFocus
+                                                            value={amount}
+                                                            onChange={(e) => setAmount(e.target.value)}
+                                                            className="block w-full pl-16 pr-8 py-8 bg-white/5 border border-white/5 rounded-[2.5rem] font-black text-4xl tabular-nums text-white placeholder-white/5 focus:outline-none focus:bg-white/10 focus:border-primary/30 transition-all shadow-inner"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {amount && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        className={cn(
+                                                            "p-6 rounded-3xl border transition-all flex justify-between items-center",
+                                                            discrepancy === 0 ? "bg-emerald-500/10 border-emerald-500/20" :
+                                                                discrepancy > 0 ? "bg-primary/10 border-primary/20" : "bg-red-500/10 border-red-500/20"
+                                                        )}
+                                                    >
+                                                        <div>
+                                                            <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-40">
+                                                                {discrepancy === 0 ? "Balance Cuadrado" :
+                                                                    discrepancy > 0 ? "Sobrante Detectado" : "Faltante Detectado"}
+                                                            </p>
+                                                            <span className={cn(
+                                                                "text-2xl font-black tabular-nums tracking-tighter",
+                                                                discrepancy === 0 ? "text-emerald-400" :
+                                                                    discrepancy > 0 ? "text-primary" : "text-red-400"
+                                                            )}>
+                                                                {formatCurrency(discrepancy)}
+                                                            </span>
+                                                        </div>
+                                                        <div className={cn(
+                                                            "w-12 h-12 rounded-xl flex items-center justify-center",
+                                                            discrepancy === 0 ? "bg-emerald-500/20 text-emerald-400" :
+                                                                discrepancy > 0 ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-400"
+                                                        )}>
+                                                            {discrepancy === 0 ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+
+                                                <button
+                                                    type="submit"
+                                                    disabled={loading || !amount}
+                                                    title="Cerrar turno operativo"
+                                                    className="w-full py-7 bg-primary text-secondary rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4"
+                                                >
+                                                    {loading ? (
+                                                        <div className="w-6 h-6 border-4 border-secondary/30 border-t-secondary rounded-full animate-spin" />
+                                                    ) : (
+                                                        <>
+                                                            <Zap className="w-6 h-6" />
+                                                            <span>Cerrar Turno</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </form>
                                         </div>
                                     </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
-                                    {amount && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: -10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className={cn(
-                                                "p-6 rounded-3xl border transition-all flex justify-between items-center",
-                                                discrepancy === 0 ? "bg-emerald-500/10 border-emerald-500/20" :
-                                                    discrepancy > 0 ? "bg-primary/10 border-primary/20" : "bg-red-500/10 border-red-500/20"
-                                            )}
-                                        >
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-40">
-                                                    {discrepancy === 0 ? "Balance Cuadrado" :
-                                                        discrepancy > 0 ? "Sobrante Detectado" : "Faltante Detectado"}
-                                                </p>
-                                                <span className={cn(
-                                                    "text-2xl font-black tabular-nums tracking-tighter",
-                                                    discrepancy === 0 ? "text-emerald-400" :
-                                                        discrepancy > 0 ? "text-primary" : "text-red-400"
-                                                )}>
-                                                    {formatCurrency(discrepancy)}
-                                                </span>
-                                            </div>
-                                            <div className={cn(
-                                                "w-12 h-12 rounded-xl flex items-center justify-center",
-                                                discrepancy === 0 ? "bg-emerald-500/20 text-emerald-400" :
-                                                    discrepancy > 0 ? "bg-primary/20 text-primary" : "bg-red-500/20 text-red-400"
-                                            )}>
-                                                {discrepancy === 0 ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
-                                            </div>
-                                        </motion.div>
-                                    )}
-
-                                    <button
-                                        type="submit"
-                                        disabled={loading || !amount}
-                                        title="Cerrar turno operativo"
-                                        aria-label="Cerrar turno operativo"
-                                        className="w-full py-7 bg-primary text-secondary rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-4"
-                                    >
-                                        {loading ? (
-                                            <div className="w-6 h-6 border-4 border-secondary/30 border-t-secondary rounded-full animate-spin" />
-                                        ) : (
-                                            <>
-                                                < Zap className="w-6 h-6" />
-                                                <span>Cerrar Turno</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-center">
+                        <div className="flex justify-center mt-12">
                             <Logo className="h-6 w-auto opacity-10 grayscale" variant="premium" />
                         </div>
                     </div>

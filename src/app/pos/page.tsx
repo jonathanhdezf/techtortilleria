@@ -84,12 +84,14 @@ export default async function POSPage() {
         })
 
         const abonosDetail = await prisma.$queryRaw<any[]>`
-            SELECT t.id, t.amount, t."createdAt", t.description, c.name as "customerName"
+            SELECT t.id, t.amount, t."createdAt", t.description, 
+                   COALESCE(c.name, d.name) as "customerName"
             FROM credit_transactions t
-            JOIN customers c ON t."customerId" = c.id
+            LEFT JOIN customers c ON t."customerId" = c.id
+            LEFT JOIN distributors d ON t."distributorId" = d.id
             WHERE t.type = 'abonos'
             AND t."createdAt" >= ${openRegister.openedAt}
-            AND c."businessId" = ${dbUser.businessId}
+            AND (c."businessId" = ${dbUser.businessId} OR d."businessId" = ${dbUser.businessId})
             ORDER BY t."createdAt" DESC
         `
 

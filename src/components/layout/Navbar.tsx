@@ -62,7 +62,7 @@ export default function Navbar() {
                             Terminal POS
                         </Link>
                         <Link
-                            href="/distribuidores/login"
+                            href="/distribuidores"
                             className="text-[10px] font-black px-5 py-2.5 rounded-xl bg-primary text-black hover:bg-white transition-all shadow-lg shadow-primary/10 uppercase tracking-widest"
                         >
                             Distribuidores
@@ -98,7 +98,7 @@ export default function Navbar() {
                     ))}
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
                         <Link href="/pos" className="text-[10px] font-black text-center py-4 bg-white/5 text-white rounded-2xl border border-white/10 uppercase tracking-widest">POS</Link>
-                        <Link href="/distribuidores/login" className="text-[10px] font-black text-center py-4 bg-primary text-black rounded-2xl uppercase tracking-widest">Acceso</Link>
+                        <Link href="/distribuidores" className="text-[10px] font-black text-center py-4 bg-primary text-black rounded-2xl uppercase tracking-widest">Acceso</Link>
                     </div>
                 </motion.div>
             )}
