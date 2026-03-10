@@ -31,9 +31,9 @@ import ShiftDetailsModal from './ShiftDetailsModal'
 
 import { useModalAccessibility } from "@/hooks/useModalAccessibility";
 
-const CATEGORIES = ['Kilo', 'Medio Kilo', 'Masa', 'Salsas', 'Bebidas']
+// Removed hardcoded CATEGORIES to use database categories
 
-export default function POSClient({ products, userId, userName, businessId, activeRegister, shiftSummary }: { products: any[], userId: string, userName?: string | null, businessId: string, activeRegister?: any, shiftSummary?: any }) {
+export default function POSClient({ products, categories, userId, userName, businessId, activeRegister, shiftSummary }: { products: any[], categories: any[], userId: string, userName?: string | null, businessId: string, activeRegister?: any, shiftSummary?: any }) {
     const router = useRouter()
     const { items, addItem, removeItem, updateQuantity, clearCart, getTotal, isDistributorMode, setDistributorMode } = useCartStore()
     const [paymentMethod, setPaymentMethod] = useState('efectivo')
@@ -98,7 +98,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
     useModalAccessibility(isDistributorModalOpen, () => setIsDistributorModalOpen(false))
 
     const filteredProducts = products.filter(p => {
-        const matchesCategory = activeCategory === 'Todos' || p.category === activeCategory
+        const matchesCategory = activeCategory === 'Todos' || p.categoryName === activeCategory
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase())
         return matchesCategory && matchesSearch
     })
@@ -398,6 +398,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                         id: item.product.id,
                         name: item.product.name,
                         pricePublic: Number(item.product.pricePublic),
+                        priceDistributor: Number(item.product.priceDistributor),
                         unitType: item.product.unitType
                     } as any;
                     addItem(cartProduct);
@@ -434,12 +435,28 @@ export default function POSClient({ products, userId, userName, businessId, acti
     }
 
     return (
-        <div className="flex-1 flex flex-col w-full h-full bg-neutral-black overflow-hidden relative noise">
+        <div className="flex-1 flex flex-col w-full h-[100dvh] bg-neutral-black overflow-hidden relative noise">
             <nav className="relative z-[60] flex items-center justify-between px-8 py-4 bg-secondary/40 backdrop-blur-2xl border-b border-white/5 shrink-0">
                 <div className="flex items-center gap-12">
                     <Logo className="h-10 md:h-12 w-auto" variant="premium" />
 
                     <div className="hidden lg:flex items-center gap-8">
+                        <div className="hidden lg:flex items-center gap-6 bg-white/5 px-6 py-2.5 rounded-2xl border border-white/5 backdrop-blur-md">
+                            <div className="flex items-center border-r border-white/10 pr-6 mr-2">
+                                <span className="text-lg font-black text-primary tabular-nums tracking-tighter">
+                                    {timeData.time}
+                                </span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[8px] font-black text-primary uppercase tracking-[0.3em] leading-none mb-0.5">
+                                    {timeData.day}
+                                </span>
+                                <span className="text-[10px] font-black text-white/60 italic uppercase tracking-tighter">
+                                    {timeData.date}
+                                </span>
+                            </div>
+                        </div>
+
                         <div className="flex items-center gap-4 border-l border-white/5 pl-8">
                             {!isOnline && (
                                 <div className="flex items-center gap-2">
@@ -457,23 +474,6 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 </div>
 
                 <div className="flex items-center gap-8">
-                    {/* Widget de Fecha y Hora Simplificado */}
-                    <div className="hidden lg:flex items-center gap-6 bg-white/5 px-6 py-2.5 rounded-2xl border border-white/5 backdrop-blur-md">
-                        <div className="flex items-center border-r border-white/10 pr-6 mr-2">
-                            <span className="text-lg font-black text-primary tabular-nums tracking-tighter">
-                                {timeData.time}
-                            </span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[8px] font-black text-primary uppercase tracking-[0.3em] leading-none mb-0.5">
-                                {timeData.day}
-                            </span>
-                            <span className="text-[10px] font-black text-white/60 italic uppercase tracking-tighter">
-                                {timeData.date}
-                            </span>
-                        </div>
-                    </div>
-
                     {/* Botón de Test Reposicionado */}
                     <button
                         onClick={() => {
@@ -517,7 +517,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                                    className="absolute top-full right-0 mt-4 w-72 bg-secondary/95 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 rounded-[2.5rem] p-4 z-[100] grid gap-2"
+                                    className="absolute top-full right-0 mt-4 w-72 bg-[#121212] shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/10 rounded-[2.5rem] p-4 z-[100] grid gap-2"
                                 >
                                     <div className="px-5 py-3 border-b border-white/5 mb-2">
                                         <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Gestión de Terminal</p>
@@ -591,27 +591,16 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                     </button>
 
                                     <button
-                                        onClick={() => {
-                                            if (activeRegister) {
-                                                // Alert and direct them to close register
-                                                return;
-                                            }
-                                            window.location.href = '/login';
+                                        onClick={async () => {
+                                            const { logoutAction } = await import('@/app/actions/auth')
+                                            await logoutAction()
                                         }}
-                                        className={cn(
-                                            "flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all mt-1",
-                                            activeRegister
-                                                ? "text-white/10 cursor-not-allowed opacity-50"
-                                                : "text-red-500 hover:bg-red-500/10"
-                                        )}
-                                        title={activeRegister ? "Debe realizar el Corte de Caja antes de cerrar sesión" : "Cerrar Sesión"}
+                                        className="flex items-center gap-4 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all mt-1 text-red-500 hover:bg-red-500/10"
+                                        title="Cerrar Sesión"
                                     >
                                         <LogOut className="w-4 h-4" />
                                         <div className="flex flex-col text-left">
                                             <span>Cerrar Sesión</span>
-                                            {activeRegister && (
-                                                <span className="text-[7px] opacity-40 lowercase not-italic tracking-normal">Realice el corte primero</span>
-                                            )}
                                         </div>
                                     </button>
                                 </motion.div>
@@ -631,25 +620,83 @@ export default function POSClient({ products, userId, userName, businessId, acti
                 <AnimatePresence>
                     {isCheckoutModalOpen && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !saleComplete && setCheckoutModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-                            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-secondary overflow-y-auto border border-white/5 rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-10 max-w-md w-full shadow-2xl max-h-[90vh] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                            <motion.div 
+                                initial={{ opacity: 0 }} 
+                                animate={{ opacity: 1 }} 
+                                exit={{ opacity: 0 }} 
+                                onClick={() => !saleComplete && setCheckoutModalOpen(false)} 
+                                className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+                            />
+                            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative bg-secondary overflow-y-auto border border-white/5 rounded-[2.5rem] md:rounded-[3rem] p-6 md:p-7 max-w-md w-full shadow-2xl max-h-[92vh] scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                 {!saleComplete ? (
                                     <div className="relative z-10">
-                                        <div className="flex justify-between items-center mb-10">
-                                            <div><p className="text-[10px] font-black text-primary uppercase tracking-[0.4em] mb-2 leading-none">Cierre de Operación</p><h2 className="text-3xl font-black text-white italic uppercase tracking-tighter">Procesar <span className="text-primary">Pago</span></h2></div>
-                                            <button onClick={() => setCheckoutModalOpen(false)} className="p-4 bg-white/5 rounded-2xl text-surface/20 hover:text-white transition-colors flex items-center gap-3 group" title="Cerrar modal (F2)"><span className="text-[10px] font-black opacity-0 group-hover:opacity-40 transition-opacity whitespace-nowrap">DESCARTAR (F2)</span><X className="w-6 h-6" /></button>
+                                        <div className="flex justify-between items-center mb-5">
+                                            <div><p className="text-[9px] font-black text-primary uppercase tracking-[0.4em] mb-1 leading-none">Cierre de Operación</p><h2 className="text-xl font-black text-white italic uppercase tracking-tighter">Procesar <span className="text-primary">Pago</span></h2></div>
+                                            <button onClick={() => setCheckoutModalOpen(false)} className="p-2.5 bg-white/5 rounded-xl text-surface/20 hover:text-white transition-colors flex items-center gap-2 group" title="Cerrar modal (F2)"><span className="text-[9px] font-black opacity-0 group-hover:opacity-40 transition-opacity whitespace-nowrap">DESCARTAR (F2)</span><X className="w-4 h-4" /></button>
                                         </div>
-                                        <div className="bg-white/5 p-8 rounded-[2.5rem] border border-white/5 mb-8"><div className="flex justify-between items-center mb-4"><span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em]">Total a Liquidar</span><span className="px-4 py-1.5 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-widest border border-primary/10">{paymentMethod}</span></div><div className="text-6xl font-black text-primary tracking-tighter tabular-nums leading-none">{formatCurrency(Number(currentTotal))}</div></div>
-                                        {paymentMethod === 'efectivo' && (
-                                            <div className="space-y-6 mb-10">
-                                                <div><label className="block text-[10px] font-black text-surface/20 uppercase tracking-[0.4em] mb-4 ml-4">Monto Recibido</label><div className="relative"><span className="absolute left-8 top-1/2 -translate-y-1/2 text-primary font-black text-3xl italic">$</span><input type="number" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} className="w-full pl-16 pr-8 py-8 bg-white/5 border border-white/10 rounded-[2rem] text-white font-black text-4xl tabular-nums focus:border-primary focus:bg-white/10 transition-all outline-none" placeholder="0.00" autoFocus /></div></div>
-                                                <div className={cn("p-8 rounded-[2.5rem] border transition-all flex justify-between items-center overflow-hidden relative", change >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20')}><div><p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2 opacity-50">Cambio a Devolver</p><div className={cn("text-4xl font-black tracking-tighter tabular-nums", change >= 0 ? 'text-emerald-400' : 'text-red-400')}>{formatCurrency(Math.max(0, change))}</div></div><div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center", change >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400")}><Zap className="w-8 h-8" /></div></div>
+                                        <div className="bg-white/5 p-5 rounded-[1.5rem] border border-white/5 mb-5 text-center">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-[9px] font-black text-surface/20 uppercase tracking-[0.3em]">Total a Liquidar</span>
+                                                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-[8px] font-black uppercase tracking-widest border border-primary/10">{paymentMethod}</span>
+                                            </div>
+                                            <div className="text-4xl font-black text-primary tracking-tighter tabular-nums leading-none">{formatCurrency(Number(currentTotal))}</div>
+                                        </div>
+                                        
+                                        {(paymentMethod === 'efectivo' || paymentMethod === 'distribuidor') && (
+                                            <div className="space-y-4 mb-6">
+                                                <div>
+                                                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-[0.4em] mb-2 ml-4">Monto Recibido</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black text-xl italic">$</span>
+                                                        <input type="number" step="any" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} className="w-full pl-12 pr-6 py-4.5 bg-white/5 border border-white/10 rounded-[1.2rem] text-white font-black text-3xl tabular-nums focus:border-primary focus:bg-white/10 transition-all outline-none" placeholder="0.00" autoFocus />
+                                                    </div>
+                                                </div>
+                                                <div className={cn("p-5 rounded-[1.5rem] border transition-all flex justify-between items-center overflow-hidden relative", change >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20')}>
+                                                    <div>
+                                                        <p className="text-[9px] font-black uppercase tracking-[0.3em] mb-1 opacity-50">Cambio a Devolver</p>
+                                                        <div className={cn("text-2xl font-black tracking-tighter tabular-nums", change >= 0 ? 'text-emerald-400' : 'text-red-400')}>{formatCurrency(Math.max(0, change))}</div>
+                                                    </div>
+                                                    <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", change >= 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400")}>
+                                                        <Zap className="w-5 h-5" />
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
-                                        <div className="flex gap-4"><button disabled={loading || (paymentMethod === 'efectivo' && change < 0)} onClick={handleCheckout} className="flex-1 py-6 bg-primary text-secondary rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-4">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (<><CheckCircle className="w-6 h-6" />Finalizar Venta (F1 o ENTER)</>)}</button></div>
+                                        <div className="flex gap-4">
+                                            <button 
+                                                disabled={loading || ((paymentMethod === 'efectivo' || paymentMethod === 'distribuidor') && change < 0)} 
+                                                onClick={handleCheckout} 
+                                                className="w-full py-4.5 bg-primary text-secondary rounded-[1.2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
+                                            >
+                                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (<><CheckCircle className="w-5 h-5" />Finalizar Venta (F1 o ENTER)</>)}
+                                            </button>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="relative z-10 text-center py-6"><motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="w-32 h-32 bg-primary/20 text-primary rounded-[3rem] flex items-center justify-center mx-auto mb-10 shadow-3xl shadow-primary/10"><CheckCircle className="w-16 h-16" /></motion.div><p className="text-[12px] font-black text-primary uppercase tracking-[0.5em] mb-4">Operación Finalizada</p><h2 className="text-5xl font-black text-white italic uppercase tracking-tighter mb-4">¡VENTA <span className="text-primary">EXITOSA</span>!</h2>{paymentMethod === 'efectivo' && (<div className="bg-white/5 py-4 px-8 rounded-full border border-white/5 inline-flex items-center gap-4 mb-12"><span className="text-[10px] font-black text-surface/20 uppercase tracking-widest">Cambio Entregado:</span><span className="font-black text-2xl text-primary tracking-tighter tabular-nums">{formatCurrency(saleComplete.change)}</span></div>)}<div className="flex flex-col gap-4 max-w-xs mx-auto"><button onClick={() => finishSale(true)} className="w-full py-6 bg-white/5 hover:bg-white/10 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs border border-white/10 transition-all flex items-center justify-center gap-4 group"><Printer className="w-5 h-5 group-hover:scale-110 transition-transform" />Imprimir Comprobante (F1)</button><button onClick={() => finishSale(false)} className="w-full py-6 bg-primary text-secondary rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-primary/20 hover:scale-105 transition-all">Siguiente Operación (F2)</button></div></div>
+                                    <div className="relative z-10 text-center py-2">
+                                        <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} className="w-20 h-20 bg-primary/20 text-primary rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-3xl shadow-primary/10">
+                                            <CheckCircle className="w-10 h-10" />
+                                        </motion.div>
+                                        <p className="text-[9px] font-black text-primary uppercase tracking-[0.5em] mb-2">Operación Finalizada</p>
+                                        <h2 className="text-3xl font-black text-white italic uppercase tracking-tighter mb-3">¡VENTA <span className="text-primary">EXITOSA</span>!</h2>
+                                        
+                                        {paymentMethod === 'efectivo' && (
+                                            <div className="bg-white/5 py-2 px-5 rounded-full border border-white/5 inline-flex items-center gap-3 mb-6">
+                                                <span className="text-[8px] font-black text-surface/20 uppercase tracking-widest">Cambio Entregado:</span>
+                                                <span className="font-black text-lg text-primary tracking-tighter tabular-nums">{formatCurrency(saleComplete.change)}</span>
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex flex-col gap-2.5 max-w-xs mx-auto">
+                                            <button onClick={() => finishSale(true)} className="w-full py-4.5 bg-white/5 hover:bg-white/10 text-white rounded-[1.2rem] font-black uppercase tracking-widest text-[9px] border border-white/10 transition-all flex items-center justify-center gap-3 group">
+                                                <Printer className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                                Imprimir Comprobante (F1)
+                                            </button>
+                                            <button onClick={() => finishSale(false)} className="w-full py-4.5 bg-primary text-secondary rounded-[1.2rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+                                                Siguiente Operación (F2)
+                                            </button>
+                                        </div>
+                                    </div>
                                 )}
                             </motion.div>
                         </div>
@@ -674,15 +721,34 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     )}
                 </AnimatePresence>
 
-                <div className={cn("flex-1 flex flex-col p-6 md:p-8 lg:p-12 overflow-hidden transition-all duration-300 relative z-10", isCartOpen ? "hidden md:flex opacity-0 lg:opacity-100" : "flex")}>
+                <div className={cn("flex-1 flex flex-col p-4 md:p-6 lg:p-8 overflow-hidden transition-all duration-300 relative z-10", isCartOpen ? "hidden md:flex opacity-0 lg:opacity-100" : "flex")}>
                     {view === 'catalog' ? (
                         <div className="flex-1 flex flex-col overflow-hidden">
-                            <div className="mb-8 flex flex-col md:flex-row items-center gap-6 bg-white/[0.02] p-4 rounded-3xl border border-white/[0.05]">
-                                <div className="relative w-full md:w-72 group"><Search className="absolute left-5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20 group-focus-within:text-primary transition-colors" /><input type="text" placeholder="BUSCAR PRODUCTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-6 py-3.5 bg-neutral-black/40 border border-white/5 rounded-2xl text-[10px] font-black tracking-[0.2em] text-white focus:bg-white/5 focus:border-primary/40 transition-all outline-none placeholder:text-white/10" /></div>
+                            <div className="mb-6 flex flex-col md:flex-row justify-between items-end gap-6 relative z-10">
+                                <div className="space-y-1">
+                                    <p className="text-[9px] font-black text-primary uppercase tracking-[0.5em] mb-2 ml-1">Inventario Activo</p>
+                                    <h1 className="text-4xl md:text-5xl font-black text-white italic uppercase tracking-tighter leading-[0.85]">
+                                        Catálogo de<br />
+                                        <span className="text-primary">Productos</span>
+                                    </h1>
+                                </div>
+                                <div className="flex items-center gap-4 bg-white/[0.03] backdrop-blur-xl border border-white/5 p-4 rounded-3xl shadow-2xl group hover:bg-white/[0.05] transition-all">
+                                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                                        <Package className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-black text-white italic uppercase tracking-tight">{filteredProducts.length} Items</p>
+                                        <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em]">Disponibles</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-6 flex flex-col md:flex-row items-center gap-4 bg-white/[0.02] p-3 rounded-2xl border border-white/[0.05]">
+                                <div className="relative w-full md:w-64 group"><Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20 group-focus-within:text-primary transition-colors" /><input type="text" placeholder="BUSCAR PRODUCTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-5 py-3 bg-neutral-black/40 border border-white/5 rounded-xl text-[9px] font-black tracking-[0.2em] text-white focus:bg-white/5 focus:border-primary/40 transition-all outline-none placeholder:text-white/10" /></div>
                                 <div className="h-8 w-px bg-white/5 hidden md:block" />
                                 <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 scrollbar-none">
                                     <button onClick={() => setActiveCategory('Todos')} className={cn("px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all whitespace-nowrap border", activeCategory === 'Todos' ? "bg-primary text-secondary border-primary shadow-lg shadow-primary/10" : "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white border-white/5")}>Todos</button>
-                                    {CATEGORIES.map(c => (<button key={c} onClick={() => setActiveCategory(c)} className={cn("px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all whitespace-nowrap border", activeCategory === c ? "bg-primary text-secondary border-primary shadow-lg shadow-primary/10" : "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white border-white/5")}>{c}</button>))}
+                                    {categories.map(c => (<button key={c.id} onClick={() => setActiveCategory(c.name)} className={cn("px-5 py-3 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all whitespace-nowrap border", activeCategory === c.name ? "bg-primary text-secondary border-primary shadow-lg shadow-primary/10" : "bg-white/5 text-white/30 hover:bg-white/10 hover:text-white border-white/5")}>{c.name}</button>))}
                                 </div>
                             </div>
                             <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 pb-24 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
@@ -702,7 +768,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                             transition={isLowStock ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
                                             key={p.id}
                                             className={cn(
-                                                "group relative bg-secondary/30 backdrop-blur-3xl border rounded-[2.5rem] p-6 hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden min-h-[240px] lg:min-h-[250px]",
+                                                "group relative bg-secondary/30 backdrop-blur-3xl border rounded-[2rem] p-5 hover:border-primary/20 hover:bg-secondary/50 shadow-2xl flex flex-col justify-between overflow-hidden min-h-[220px] lg:min-h-[230px]",
                                                 isLowStock ? "border-amber-500/20" : "border-white/5"
                                             )}
                                         >
@@ -725,14 +791,14 @@ export default function POSClient({ products, userId, userName, businessId, acti
                                                 <p className="text-[10px] font-bold text-surface/20 uppercase tracking-[0.2em] mb-3">
                                                     Precio Público
                                                 </p>
-                                                <div className="mb-6 font-mono">
-                                                    <span className="text-4xl font-black text-white tracking-tighter tabular-nums leading-none">
-                                                        {formatCurrency(Number(isDistributorMode ? p.priceDistributor : p.pricePublic))}
-                                                    </span>
-                                                    <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest ml-2">
-                                                        / {p.unitType}
-                                                    </span>
-                                                </div>
+                                                    <div className="mb-4 font-mono">
+                                                        <span className="text-3xl font-black text-white tracking-tighter tabular-nums leading-none">
+                                                            {formatCurrency(Number(isDistributorMode ? p.priceDistributor : p.pricePublic))}
+                                                        </span>
+                                                        <span className="text-[9px] font-black text-surface/20 uppercase tracking-widest ml-2">
+                                                            / {p.unitType}
+                                                        </span>
+                                                    </div>
                                             </div>
                                             <div className="relative z-10 space-y-3 mt-auto">
                                                 {isKg ? (
@@ -770,9 +836,9 @@ export default function POSClient({ products, userId, userName, businessId, acti
                     )}
                 </div>
 
-                <aside className={cn("fixed lg:relative inset-0 lg:inset-auto z-40 lg:z-0 lg:w-[480px] bg-secondary/40 backdrop-blur-3xl border-l border-white/5 flex flex-col shrink-0 transition-transform duration-500 ease-out shadow-2xl shadow-black", isCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0")}>
-                    <div className="p-6 md:p-7 border-b border-white/5 flex items-center justify-between"><div className="flex items-center gap-4"><button onClick={() => setIsCartOpen(false)} className="lg:hidden p-3 bg-white/5 rounded-2xl text-surface/30" title="Cerrar ticket"><X className="w-5 h-5" /></button><div><p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] mb-1">Registro Digital</p><h2 className="text-xl font-black text-white italic uppercase tracking-tighter flex items-center gap-3"><ShoppingCart className="w-5 h-5 text-primary not-italic" />Resumen de <span className="text-primary">Venta</span></h2></div></div><button onClick={clearCart} className="p-3.5 rounded-2xl bg-white/5 text-surface/20 hover:bg-red-500/10 hover:text-red-500 transition-all active:scale-90" disabled={items.length === 0} title="Anular Resumen"><Trash2 className="w-6 h-6" /></button></div>
-                    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                <aside className={cn("fixed lg:relative inset-0 lg:inset-auto z-40 lg:z-0 lg:w-[480px] lg:max-h-[820px] lg:my-auto lg:mx-8 lg:rounded-[3rem] lg:border lg:border-white/10 bg-secondary/40 backdrop-blur-3xl border-l border-white/5 flex flex-col shrink-0 transition-transform duration-500 ease-out shadow-2xl shadow-black", isCartOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0")}>
+                    <div className="shrink-0 p-6 md:p-7 border-b border-white/5 flex items-center justify-between"><div className="flex items-center gap-4"><button onClick={() => setIsCartOpen(false)} className="lg:hidden p-3 bg-white/5 rounded-2xl text-surface/30" title="Cerrar ticket"><X className="w-5 h-5" /></button><div><p className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] mb-1">Registro Digital</p><h2 className="text-xl font-black text-white italic uppercase tracking-tighter flex items-center gap-3"><ShoppingCart className="w-5 h-5 text-primary not-italic" />Resumen de <span className="text-primary">Venta</span></h2></div></div><button onClick={clearCart} className="p-3.5 rounded-2xl bg-white/5 text-surface/20 hover:bg-red-500/10 hover:text-red-500 transition-all active:scale-90" disabled={items.length === 0} title="Anular Resumen"><Trash2 className="w-6 h-6" /></button></div>
+                    <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8 space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                         {items.map((item, idx) => {
                             const isActive = selectedItemId === item.id || (!selectedItemId && idx === items.length - 1);
                             return (
@@ -810,7 +876,7 @@ export default function POSClient({ products, userId, userName, businessId, acti
                         {items.length === 0 && (<div className="h-full flex flex-col items-center justify-center py-20 text-center space-y-6"><div className="w-24 h-24 rounded-[3rem] border-2 border-dashed border-white/40 flex items-center justify-center rotate-12 opacity-20"><ShoppingCart className="w-10 h-10 text-white" /></div><div><p className="text-white font-black uppercase tracking-[0.4em] text-[10px] mb-2">Resumen Vacío</p><p className="text-white text-[9px] font-bold uppercase tracking-widest max-w-[150px] mx-auto">Esperando carga de productos para procesamiento.</p></div></div>)}
                     </div>
                     <div className={cn(
-                        "p-6 md:p-8 bg-secondary/60 backdrop-blur-3xl border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-all duration-300",
+                        "shrink-0 p-6 md:p-8 bg-secondary/60 backdrop-blur-3xl border-t border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-all duration-300",
                         items.length === 0 ? "pt-4 pb-6" : "pt-6 pb-8"
                     )}>
                         {items.length > 0 && (

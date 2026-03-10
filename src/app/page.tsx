@@ -1,3 +1,4 @@
+import React from "react";
 import Navbar from "@/components/layout/Navbar";
 import Hero from "@/components/landing/Hero";
 import Footer from "@/components/shared/Footer";
@@ -10,15 +11,15 @@ export default function Home() {
       <Hero />
 
       {/* Features Grid - PRODUCTOS */}
-      <section id="productos" className="py-32 px-6 max-w-7xl mx-auto relative overflow-hidden">
+      <section id="productos" className="py-20 md:py-32 px-4 md:px-6 max-w-7xl mx-auto relative overflow-hidden">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full -z-10" />
 
-        <div className="text-center mb-20">
+        <div className="text-center mb-12 md:mb-20">
           <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-6">
             Ecosistema de Soluciones
           </div>
-          <h2 className="text-4xl md:text-7xl font-black text-white italic uppercase tracking-tighter mb-6">Módulos <span className="text-primary not-italic">Ejecutivos</span></h2>
-          <p className="text-white/40 max-w-2xl mx-auto font-medium leading-relaxed">
+          <h2 className="text-3xl sm:text-4xl md:text-7xl font-black text-white italic uppercase tracking-tighter mb-6 leading-tight">Módulos <span className="text-primary not-italic">Ejecutivos</span></h2>
+          <p className="text-white/40 max-w-2xl mx-auto font-medium leading-relaxed text-sm md:text-base">
             Arquitectura de alto rendimiento diseñada para la modernización integral de la industria de la tortillería.
           </p>
         </div>
@@ -48,17 +49,17 @@ export default function Home() {
       </section>
 
       {/* Identity Section - HISTORIA */}
-      <section id="historia" className="bg-white/5 border-y border-white/5 py-32 px-6 overflow-hidden relative noise">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+      <section id="historia" className="bg-white/5 border-y border-white/5 py-20 md:py-32 px-4 md:px-6 overflow-hidden relative noise">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 md:gap-20 items-center">
           <div>
-            <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-8">
+            <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-6 md:mb-8">
               Nuestra Esencia
             </div>
-            <h2 className="text-5xl md:text-8xl font-black text-white mb-10 leading-[0.9] italic uppercase tracking-tighter">
+            <h2 className="text-4xl md:text-8xl font-black text-white mb-6 md:mb-10 leading-[0.95] md:leading-[0.9] italic uppercase tracking-tighter">
               La tortillería <br />
               dejó de ser <span className="text-primary not-italic underline decoration-white/10 decoration-8 underline-offset-8">invisible.</span>
             </h2>
-            <p className="text-white/50 text-xl mb-12 leading-relaxed font-medium">
+            <p className="text-white/50 text-base md:text-xl mb-8 md:mb-12 leading-relaxed font-medium">
               En el Siglo XXI, su negocio tradicional merece la vanguardia tecnológica.
               Protegemos el alma del maíz mientras impulsamos su escala con datos y eficiencia terminal.
             </p>
@@ -95,26 +96,26 @@ export default function Home() {
       </section>
 
       {/* Contact Section - CONTACTO */}
-      <section id="contacto" className="py-32 px-6 max-w-7xl mx-auto relative">
+      <section id="contacto" className="py-20 md:py-32 px-4 md:px-6 max-w-7xl mx-auto relative">
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/5 blur-[150px] rounded-full -z-10" />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 md:gap-20">
           <div>
-            <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-8">
+            <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-6 md:mb-8">
               Contacto Directo
             </div>
-            <h2 className="text-5xl md:text-8xl font-black text-white mb-8 leading-[0.9] italic uppercase tracking-tighter">
+            <h2 className="text-4xl md:text-8xl font-black text-white mb-6 md:mb-8 leading-[0.95] md:leading-[0.9] italic uppercase tracking-tighter">
               Fiberlink <br />
               <span className="text-primary not-italic">Labs.</span>
             </h2>
-            <p className="text-white/40 text-lg mb-12 font-medium leading-relaxed">
+            <p className="text-white/40 text-base md:text-lg mb-8 md:mb-12 font-medium leading-relaxed">
               Estamos listos para escalar su operación. Contacte con nuestro equipo de ingeniería técnica para una consultoría ejecutiva.
             </p>
 
-            <div className="space-y-6">
-              <ContactInfo icon={<Mail className="w-5 h-5" />} label="Email Ejecutivo" value="fiberlinkserviciostic@gmail.com" />
-              <ContactInfo icon={<Phone className="w-5 h-5" />} label="Línea Directa" value="+52 233 107 2438" />
-              <ContactInfo icon={<MapPin className="w-5 h-5" />} label="Hub Tecnológico" value="Cuauhtémoc 1010 Col. Centro 73800 Teziutlán. Puebla. México." />
+            <div className="space-y-4 md:space-y-6">
+              <ContactInfo icon={<Mail className="w-4 h-4 md:w-5 md:h-5" />} label="Email Ejecutivo" value="fiberlinkserviciostic@gmail.com" />
+              <ContactInfo icon={<Phone className="w-4 h-4 md:w-5 md:h-5" />} label="Línea Directa" value="+52 233 107 2438" />
+              <ContactInfo icon={<MapPin className="w-4 h-4 md:w-5 md:h-5" />} label="Hub Tecnológico" value="Cuauhtémoc 1010 Col. Centro 73800 Teziutlán. Puebla. México." />
             </div>
           </div>
 
@@ -152,8 +153,8 @@ export default function Home() {
 
 function ContactInfo({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
   return (
-    <div className="flex items-center gap-5 group">
-      <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
+    <div className="flex items-center gap-4 md:gap-5 group">
+      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
         {icon}
       </div>
       <div>
@@ -166,10 +167,10 @@ function ContactInfo({ icon, label, value }: { icon: React.ReactNode, label: str
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
   return (
-    <div className="p-10 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-3xl hover:bg-white/10 transition-all hover:-translate-y-2 group relative overflow-hidden">
+    <div className="p-8 md:p-10 rounded-[32px] md:rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-3xl hover:bg-white/10 transition-all hover:-translate-y-2 group relative overflow-hidden">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="w-16 h-16 bg-white/5 rounded-[22px] flex items-center justify-center mb-8 group-hover:bg-primary/20 transition-all border border-white/10 group-hover:border-primary/20">
-        {icon}
+      <div className="w-12 h-12 md:w-16 md:h-16 bg-white/5 rounded-xl md:rounded-[22px] flex items-center justify-center mb-6 md:mb-8 group-hover:bg-primary/20 transition-all border border-white/10 group-hover:border-primary/20">
+        {React.cloneElement(icon as React.ReactElement<any>, { className: "w-6 h-6 md:w-8 md:h-8 text-primary" })}
       </div>
       <h3 className="text-sm font-black text-white mb-4 uppercase tracking-[0.3em]">{title}</h3>
       <p className="text-white/40 text-[13px] leading-relaxed font-medium">{description}</p>

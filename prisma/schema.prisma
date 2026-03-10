@@ -30,6 +30,7 @@ model Business {
   expenses                 Expense[]
   inventoryMovements       InventoryMovement[]
   products                 Product[]
+  categories               Category[]
   sales                    Sale[]
   users                    User[]
 
@@ -64,11 +65,13 @@ model Product {
   stockQuantity      Decimal                @db.Decimal(10, 2)
   minimumStockAlert  Decimal                @db.Decimal(10, 2)
   active             Boolean                @default(true)
-  category           String?
+  categoryName       String?
+  categoryId         String?
   createdAt          DateTime               @default(now())
   orderItems         DistributorOrderItem[]
   inventoryMovements InventoryMovement[]
   business           Business               @relation(fields: [businessId], references: [id])
+  category           Category?              @relation(fields: [categoryId], references: [id])
   saleItems          SaleItem[]
 
   @@index([businessId])
@@ -265,6 +268,19 @@ model CreditTransaction {
   distributor   Distributor? @relation(fields: [distributorId], references: [id])
 
   @@map("credit_transactions")
+}
+
+model Category {
+  id         String   @id @default(uuid())
+  businessId String
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id])
+  products   Product[]
+
+  @@unique([businessId, name])
+  @@map("categories")
 }
 
 enum Role {

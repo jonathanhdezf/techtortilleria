@@ -28,7 +28,8 @@ import {
     getAdminMetricsAction, getSalesAction, getDistributorOrdersAction,
     getProductsFullAction, getInventoryAction, getInventoryMovementsAction,
     updateProductAction, createProductAction, createInventoryMovementAction,
-    updateOrderStatusAction, toggleProductActiveAction
+    updateOrderStatusAction, toggleProductActiveAction,
+    getCategoriesAction, createCategoryAction, updateCategoryAction, toggleCategoryActiveAction, deleteCategoryAction
 } from "@/app/actions/admin";
 import { logoutAction } from "@/app/actions/auth";
 
@@ -80,8 +81,14 @@ export default function AdminClient() {
     const [registerDetailModal, setRegisterDetailModal] = useState<{ open: boolean, data: any }>({ open: false, data: null });
     const [distributorOrderDetailModal, setDistributorOrderDetailModal] = useState<{ open: boolean, data: any }>({ open: false, data: null });
     const [distributorModal, setDistributorModal] = useState<{ open: boolean, editing: boolean, data: any }>({ open: false, editing: false, data: null });
+    const [categoryModal, setCategoryModal] = useState<{ open: boolean, editing: boolean, data: any }>({ open: false, editing: false, data: null });
     const [isDetailLoading, setIsDetailLoading] = useState(false);
-    const [isExiting, setIsExiting] = useState(false);
+
+    const [customers, setCustomers] = useState<any[]>([]);
+    const [distributors, setDistributors] = useState<any[]>([]);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [orders, setOrders] = useState<any[]>([]);
+
     const [formError, setFormError] = useState("");
     const [saving, setSaving] = useState(false);
     const [visibleSalesCount, setVisibleSalesCount] = useState(5);
@@ -91,12 +98,13 @@ export default function AdminClient() {
     // Form states
     const [pForm, setPForm] = useState({
         name: "", description: "", pricePublic: 0, priceDistributor: 0,
-        unitType: "KG", stockQuantity: 0, minimumStockAlert: 10, category: "Tortillería"
+        unitType: "KG", stockQuantity: 0, minimumStockAlert: 10, categoryName: "", categoryId: ""
     });
     const [uForm, setUForm] = useState({ name: "", email: "", password: "", role: "CAJERO" });
     const [mForm, setMForm] = useState({ productId: "", movementType: "entrada_produccion", quantity: 0 });
     const [cForm, setCForm] = useState({ name: "", phone: "", email: "", address: "", creditLimit: 0 });
     const [dForm, setDForm] = useState({ name: "", contactName: "", phone: "", email: "", address: "", creditLimit: 0 });
+    const [catForm, setCatForm] = useState({ name: "" });
 
     // Modal accessibility hooks
     useModalAccessibility(productModal.open, () => setProductModal({ ...productModal, open: false }));
@@ -108,70 +116,54 @@ export default function AdminClient() {
     useModalAccessibility(customerModal.open, () => setCustomerModal({ ...customerModal, open: false }));
     useModalAccessibility(deleteConfirmModal.open, () => setDeleteConfirmModal({ ...deleteConfirmModal, open: false }));
 
-    // Lock scroll when exiting
-    useEffect(() => {
-        if (isExiting) {
-            document.body.style.overflow = 'hidden';
-            window.scrollTo(0, 0);
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [isExiting]);
 
     const loadData = async () => {
-        if (isExiting) return;
         try {
             setLoading(true);
             const mData = await getAdminMetricsAction();
-            if (isExiting) return;
             setMetrics(mData);
 
-            // Load secondary data based on current tab
+            // Fetch categories as well as they are needed for modals
+            const cats = await getCategoriesAction();
+            setCategories(cats);
+
             if (activeTab === "ventas") {
                 const sData = await getSalesAction(selectedDate);
-                if (activeTab === "ventas" && !isExiting) setSecondaryData(sData);
+                setSecondaryData(sData);
             } else if (activeTab === "distribuidores") {
                 const dData = await getDistributorOrdersAction(selectedDate);
-                if (activeTab === "distribuidores" && !isExiting) setSecondaryData(dData);
+                setSecondaryData(dData);
             } else if (activeTab === "productos") {
                 const pData = await getProductsFullAction();
-                if (activeTab === "productos" && !isExiting) setSecondaryData(pData);
+                setSecondaryData(pData);
             } else if (activeTab === "inventario") {
                 const [iData, movData] = await Promise.all([getInventoryAction(), getInventoryMovementsAction()]);
-                if (activeTab === "inventario" && !isExiting) setSecondaryData({ products: iData, movements: movData });
+                setSecondaryData({ products: iData, movements: movData });
             } else if (activeTab === "usuarios") {
                 const uData = await getUsersAction();
-                if (activeTab === "usuarios" && !isExiting) setSecondaryData(uData);
+                setSecondaryData(uData);
             } else if (activeTab === "cortes") {
                 const cData = await getCashRegistersAction(selectedDate);
-                if (activeTab === "cortes" && !isExiting) setSecondaryData(cData);
+                setSecondaryData(cData);
             } else if (activeTab === "clientes") {
                 const clData = await getCustomersAction();
-                if (activeTab === "clientes" && !isExiting) setSecondaryData(clData);
+                setSecondaryData(clData);
             } else if (activeTab === "gestionar-distribuidores") {
                 const dData = await getDistributorsAction();
-                if (activeTab === "gestionar-distribuidores" && !isExiting) setSecondaryData(dData);
+                setSecondaryData(dData);
+            } else if (activeTab === "categorias") {
+                const catData = await getCategoriesAction();
+                setSecondaryData(catData);
             }
         } catch (error) {
-            if (!isExiting) console.error("Error loading admin data:", error);
+            console.error("Error loading admin data:", error);
         } finally {
-            if (!isExiting) setLoading(false);
+            setLoading(false);
         }
     };
 
     const handleLogout = async () => {
-        setIsExiting(true);
-
-        // Fase visual: Mostrar el overlay de seguridad durante 3 segundos
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
         try {
-            // Supabase client-side sign out (opcional pero ayuda a limpiar el estado local rápido)
-            await supabase.auth.signOut();
-            // Acción de servidor para limpiar cookies y redirigir
             await logoutAction();
         } catch (error: any) {
             // Ignorar errores de redirección interna de Next.js
@@ -193,7 +185,7 @@ export default function AdminClient() {
 
     // Product modal helpers
     const openNewProduct = () => {
-        setPForm({ name: "", description: "", pricePublic: 0, priceDistributor: 0, unitType: "KG", stockQuantity: 0, minimumStockAlert: 10, category: "Tortillería" });
+        setPForm({ name: "", description: "", pricePublic: 0, priceDistributor: 0, unitType: "KG", stockQuantity: 0, minimumStockAlert: 10, categoryName: "", categoryId: "" });
         setProductModal({ open: true, editing: false, data: null });
         setFormError("");
     };
@@ -207,7 +199,8 @@ export default function AdminClient() {
             unitType: product.unitType,
             stockQuantity: product.stockQuantity,
             minimumStockAlert: product.minimumStockAlert,
-            category: product.category || "Tortillería"
+            categoryName: product.categoryName || "",
+            categoryId: product.categoryId || ""
         });
         setProductModal({ open: true, editing: true, data: product });
         setFormError("");
@@ -354,6 +347,54 @@ export default function AdminClient() {
         finally { setSaving(false); }
     };
 
+    // Category modal helpers
+    const openNewCategory = () => {
+        setCatForm({ name: "" });
+        setCategoryModal({ open: true, editing: false, data: null });
+        setFormError("");
+    };
+
+    const openEditCategory = (category: any) => {
+        setCatForm({ name: category.name });
+        setCategoryModal({ open: true, editing: true, data: category });
+        setFormError("");
+    };
+
+    const handleSaveCategory = async () => {
+        if (!catForm.name) { setFormError("El nombre es obligatorio"); return; }
+        setSaving(true); setFormError("");
+        try {
+            const res = categoryModal.editing
+                ? await updateCategoryAction(categoryModal.data.id, catForm.name)
+                : await createCategoryAction(catForm);
+
+            if (res.success) {
+                setCategoryModal({ ...categoryModal, open: false });
+                loadData();
+            } else {
+                setFormError(res.error || "Error al guardar");
+            }
+        } catch (e) { setFormError("Error de conexión"); }
+        finally { setSaving(false); }
+    };
+
+    const handleDeleteCategory = async (id: string) => {
+        setSaving(true);
+        try {
+            const res = await deleteCategoryAction(id);
+            if (res.success) loadData();
+            else alert(res.error);
+        } catch (e) { alert("Error de conexión"); }
+        finally { setSaving(false); }
+    };
+
+    const handleToggleCategory = async (id: string, active: boolean) => {
+        try {
+            const res = await toggleCategoryActiveAction(id, active);
+            if (res.success) loadData();
+        } catch (e) { console.error(e); }
+    };
+
     const openRegisterDetail = async (id: string) => {
         try {
             setIsDetailLoading(true);
@@ -460,6 +501,7 @@ export default function AdminClient() {
                             <AdminNavItem icon={<Users />} label="Gestión Distribuidores" active={activeTab === "gestionar-distribuidores"} onClick={() => switchTab("gestionar-distribuidores")} />
                             <div className="hidden lg:block pt-2 pb-1"><p className="text-surface/20 text-[10px] font-black uppercase tracking-widest px-4">Operaciones</p></div>
                             <AdminNavItem icon={<Package />} label="Gestión de Productos" active={activeTab === "productos"} onClick={() => switchTab("productos")} />
+                            <AdminNavItem icon={<Settings />} label="Categorías" active={activeTab === "categorias"} onClick={() => switchTab("categorias")} />
                             <AdminNavItem icon={<Scale />} label="Corte de Cajas" active={activeTab === "cortes"} onClick={() => switchTab("cortes")} />
                             <AdminNavItem icon={<ClipboardList />} label="Control de Inventario" active={activeTab === "inventario"} onClick={() => switchTab("inventario")} />
                             <AdminNavItem icon={<Users />} label="Clientes" active={activeTab === "clientes"} onClick={() => switchTab("clientes")} />
@@ -1568,8 +1610,86 @@ export default function AdminClient() {
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === "categorias" && (
+                            <div className="space-y-12">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 px-6">
+                                    <div>
+                                        <h2 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter leading-none">Gestión de <span className="text-primary italic">Categorías</span></h2>
+                                        <div className="flex items-center gap-3 mt-4">
+                                            <div className="h-[1px] w-8 bg-primary/40" />
+                                            <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Organización del catálogo de productos</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={openNewCategory}
+                                        className="px-10 py-6 bg-primary text-secondary rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+                                    >
+                                        <Plus className="w-5 h-5" /> Nueva Categoría
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {Array.isArray(secondaryData) && secondaryData.map((cat: any) => (
+                                        <div 
+                                            key={cat.id} 
+                                            className="bg-secondary/40 backdrop-blur-3xl p-10 rounded-[3rem] border border-white/5 shadow-2xl relative overflow-hidden group hover:border-primary/20 transition-all"
+                                        >
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            
+                                            <div className="flex justify-between items-start mb-8">
+                                                <div className="w-16 h-16 bg-white/5 rounded-3xl flex items-center justify-center text-primary border border-white/5 group-hover:scale-110 transition-transform">
+                                                    <Settings className="w-8 h-8" />
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button 
+                                                        onClick={() => handleToggleCategory(cat.id, !cat.active)}
+                                                        className={cn(
+                                                            "w-12 h-12 rounded-xl flex items-center justify-center transition-all border border-white/5",
+                                                            cat.active ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-white/5 text-white/20 hover:bg-white/10"
+                                                        )}
+                                                        title={cat.active ? "Desactivar" : "Activar"}
+                                                    >
+                                                        {cat.active ? <CheckCircle className="w-5 h-5" /> : <X className="w-5 h-5" />}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-2 group-hover:text-primary transition-colors">{cat.name}</h3>
+                                            <p className="text-[10px] text-surface/20 font-black uppercase tracking-[0.2em] mb-8">
+                                                {cat.active ? "ACTIVA" : "INACTIVA"}
+                                            </p>
+
+                                            <div className="flex gap-4">
+                                                <button 
+                                                    onClick={() => openEditCategory(cat)}
+                                                    className="flex-1 py-4 bg-white/5 hover:bg-primary hover:text-secondary rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border border-white/5"
+                                                >
+                                                    EDITAR
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteCategory(cat.id)}
+                                                    className="w-14 h-14 bg-white/5 hover:bg-accent/10 hover:text-accent rounded-2xl flex items-center justify-center transition-all border border-white/5"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {(!Array.isArray(secondaryData) || secondaryData.length === 0) && (
+                                    <div className="p-20 text-center flex flex-col items-center justify-center bg-white/[0.02] rounded-[3rem] border border-white/5">
+                                        <div className="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center text-surface/20 mb-8 border border-white/5 shadow-inner">
+                                            <Settings className="w-10 h-10" />
+                                        </div>
+                                        <p className="text-[11px] font-black text-surface/20 uppercase tracking-[0.4em] italic">No hay categorías registradas</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                </main >
+                </main>
 
                 {/* Modals Implementation (Product, User, Customer, Movement) */}
                 <AnimatePresence>
@@ -1687,6 +1807,23 @@ export default function AdminClient() {
                                             <div className="col-span-2 lg:col-span-1">
                                                 <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Mínimo para Alerta</label>
                                                 <input type="number" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-xl font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all tabular-nums" value={pForm.minimumStockAlert} onChange={e => setPForm({ ...pForm, minimumStockAlert: Number(e.target.value) })} title="Stock Mínimo" />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Categoría</label>
+                                                <select 
+                                                    className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-[11px] font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all cursor-pointer appearance-none uppercase tracking-widest" 
+                                                    value={pForm.categoryId} 
+                                                    onChange={e => {
+                                                        const selectedCat = categories.find(c => c.id === e.target.value);
+                                                        setPForm({ ...pForm, categoryId: e.target.value, categoryName: selectedCat ? selectedCat.name : "" });
+                                                    }}
+                                                    title="Categoría"
+                                                >
+                                                    <option value="" className="bg-[#1A1A1A]">SIN CATEGORÍA</option>
+                                                    {categories.map((c: any) => (
+                                                        <option key={c.id} value={c.id} className="bg-[#1A1A1A]">{c.name.toUpperCase()}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
                                         {formError && <p className="text-accent text-[10px] font-black uppercase bg-accent/5 p-6 rounded-[2rem] text-center italic tracking-widest border border-accent/10">{formError}</p>}
@@ -1826,6 +1963,55 @@ export default function AdminClient() {
                                             <div className="absolute inset-0 bg-white/20 translate-y-full hover:translate-y-0 transition-transform" />
                                             <span className="relative flex items-center justify-center gap-3">
                                                 {saving ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : "PROCESAR AJUSTE"}
+                                            </span>
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )
+                    }
+
+                    {
+                        categoryModal.open && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-white">
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-neutral-black/90 backdrop-blur-2xl" onClick={() => setCategoryModal({ ...categoryModal, open: false })} />
+                                <motion.div initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }} className="relative bg-[#1A1A1A] w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden border border-white/5 flex flex-col max-h-[90vh]">
+                                    <div className="bg-secondary/40 p-10 relative overflow-hidden shrink-0">
+                                        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full -mr-32 -mt-32 blur-[100px] pointer-events-none opacity-20" />
+                                        <div className="relative z-10 flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none">{categoryModal.editing ? "Editar" : "Nueva"} <span className="text-primary">Categoría</span></h3>
+                                                <div className="flex items-center gap-3 mt-4">
+                                                    <div className="h-[1px] w-8 bg-primary/40" />
+                                                    <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Gestión de clasificación de productos</p>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setCategoryModal({ ...categoryModal, open: false })} className="w-14 h-14 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-white flex items-center justify-center border border-white/5 shadow-xl" title="Cerrar"><X /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-10 space-y-10 overflow-y-auto">
+                                        <div className="grid grid-cols-1 gap-8">
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Nombre de la Categoría</label>
+                                                <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10 uppercase" value={catForm.name} onChange={e => setCatForm({ name: e.target.value })} placeholder="EJ: TORTILLERÍA" title="Nombre" />
+                                            </div>
+                                        </div>
+
+                                        {formError && (
+                                            <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-accent text-[10px] font-black uppercase bg-accent/5 p-6 rounded-[2rem] text-center italic tracking-widest border border-accent/10">
+                                                {formError}
+                                            </motion.p>
+                                        )}
+
+                                        <button
+                                            onClick={handleSaveCategory}
+                                            disabled={saving}
+                                            className="w-full bg-primary text-secondary py-6 rounded-[2.5rem] font-black text-sm tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:grayscale shrink-0 relative overflow-hidden"
+                                        >
+                                            <div className="absolute inset-0 bg-white/20 translate-y-full hover:translate-y-0 transition-transform" />
+                                            <span className="relative flex items-center justify-center gap-3">
+                                                {saving ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : (categoryModal.editing ? "ACTUALIZAR CATEGORÍA" : "CREAR CATEGORÍA")}
                                             </span>
                                         </button>
                                     </div>
@@ -2267,115 +2453,9 @@ export default function AdminClient() {
                         )
                     }
 
-                    {
-                        distributorModal.open && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 text-white text-white">
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-neutral-black/90 backdrop-blur-2xl" onClick={() => setDistributorModal({ ...distributorModal, open: false })} />
-                                <motion.div initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }} className="relative bg-[#1A1A1A] w-full max-w-xl rounded-[4rem] shadow-2xl overflow-hidden border border-white/5 flex flex-col max-h-[90vh]">
-                                    <div className="bg-secondary/40 p-10 relative overflow-hidden shrink-0">
-                                        <div className="absolute top-0 right-0 w-96 h-96 bg-primary/10 rounded-full -mr-32 -mt-32 blur-[100px] pointer-events-none opacity-20" />
-                                        <div className="relative z-10 flex justify-between items-center">
-                                            <div>
-                                                <h3 className="text-4xl font-black italic uppercase tracking-tighter leading-none">{distributorModal.editing ? "Perfil de" : "Nuevo"} <span className="text-primary">{distributorModal.editing ? "Socio" : "Distribuidor"}</span></h3>
-                                                <div className="flex items-center gap-3 mt-4">
-                                                    <div className="h-[1px] w-8 bg-primary/40" />
-                                                    <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Gestión de canales de distribución</p>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => setDistributorModal({ ...distributorModal, open: false })} className="w-14 h-14 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-white flex items-center justify-center border border-white/5 shadow-xl" title="Cerrar"><X /></button>
-                                        </div>
-                                    </div>
 
-                                    <div className="p-10 space-y-10 overflow-y-auto custom-scrollbar">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                                            <div className="col-span-2">
-                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Razón Social / Nombre Comercial</label>
-                                                <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={dForm.name} onChange={e => setDForm({ ...dForm, name: e.target.value })} placeholder="EJ: DISTRIBUIDORA NORTE" title="Nombre" />
-                                            </div>
-                                            <div className="col-span-2 lg:col-span-1">
-                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Nombre de Contacto</label>
-                                                <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-base font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={dForm.contactName} onChange={e => setDForm({ ...dForm, contactName: e.target.value })} placeholder="EJ: JUAN PÉREZ" title="Contacto" />
-                                            </div>
-                                            <div className="col-span-2 lg:col-span-1">
-                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Teléfono de Enlace</label>
-                                                <input type="text" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-base font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={dForm.phone} onChange={e => setDForm({ ...dForm, phone: e.target.value })} placeholder="811 000 0000" title="Teléfono" />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Límite de Crédito Autorizado</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-8 top-1/2 -translate-y-1/2 text-primary font-black text-xl">$</span>
-                                                    <input type="number" className="w-full bg-white/5 border border-white/5 rounded-[2rem] pl-14 pr-8 py-5 text-2xl font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all" value={dForm.creditLimit} onChange={e => setDForm({ ...dForm, creditLimit: Number(e.target.value) })} title="Límite Crédito" />
-                                                </div>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Correo de Facturación</label>
-                                                <input type="email" className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-base font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10" value={dForm.email} onChange={e => setDForm({ ...dForm, email: e.target.value })} placeholder="ADMIN@DISTRIBUIDORA.COM" title="Email" />
-                                            </div>
-                                            <div className="col-span-2">
-                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Dirección Fiscal / Entrega</label>
-                                                <textarea className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-base font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all placeholder:text-surface/10 min-h-[120px] resize-none" value={dForm.address} onChange={e => setDForm({ ...dForm, address: e.target.value })} placeholder="CALLE, NÚMERO, COLONIA..." title="Dirección" />
-                                            </div>
-                                        </div>
-
-                                        {formError && (
-                                            <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-accent text-[10px] font-black uppercase bg-accent/5 p-6 rounded-[2rem] text-center italic tracking-widest border border-accent/10">
-                                                {formError}
-                                            </motion.p>
-                                        )}
-
-                                        <button
-                                            onClick={handleSaveDistributor}
-                                            disabled={saving}
-                                            className="w-full bg-primary text-secondary py-6 rounded-[2.5rem] font-black text-sm tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:grayscale shrink-0 relative overflow-hidden"
-                                        >
-                                            <div className="absolute inset-0 bg-white/20 translate-y-full hover:translate-y-0 transition-transform" />
-                                            <span className="relative flex items-center justify-center gap-3">
-                                                {saving ? <Loader2 className="w-8 h-8 animate-spin mx-auto" /> : (distributorModal.editing ? "ACTUALIZAR DISTRIBUIDOR" : "DAR DE ALTA SOCIO")}
-                                            </span>
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )
-                    }
                 </AnimatePresence>
             </div>
-
-            <AnimatePresence>
-                {isExiting && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/95 backdrop-blur-3xl"
-                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-                    >
-                        <div className="absolute inset-0 noise opacity-20 pointer-events-none" />
-                        <motion.div
-                            initial={{ scale: 0.9, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="text-center p-12 relative z-[999999]"
-                        >
-                            <div className="w-28 h-28 bg-primary/20 rounded-[3.5rem] flex items-center justify-center mb-10 mx-auto border border-primary/20 shadow-2xl shadow-primary/10">
-                                <Shield className="w-14 h-14 text-primary" />
-                            </div>
-                            <p className="text-[11px] font-black text-primary uppercase tracking-[0.6em] mb-4 drop-shadow-sm font-sans">Seguridad Terminal</p>
-                            <h2 className="text-5xl sm:text-6xl font-black text-white italic uppercase tracking-tighter mb-8 leading-none">
-                                Sesión Cerrada <br /><span className="text-primary mt-2 block">Segura</span>
-                            </h2>
-                            <p className="text-white/50 font-bold uppercase tracking-[.25em] text-[10px] max-w-sm mx-auto leading-relaxed border-t border-white/5 pt-8">
-                                Gracias por usar nuestro sistema ejecutivo. <br />Tu sesión se cerrará automáticamente en unos segundos.
-                            </p>
-
-                            <div className="mt-14 flex items-center justify-center gap-5">
-                                <div className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce [animation-delay:0s] shadow-[0_0_15px_rgba(255,204,0,0.5)]" />
-                                <div className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce [animation-delay:0.2s] shadow-[0_0_15px_rgba(255,204,0,0.5)]" />
-                                <div className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce [animation-delay:0.4s] shadow-[0_0_15px_rgba(255,204,0,0.5)]" />
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </>
     );
 }

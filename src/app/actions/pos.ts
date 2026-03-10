@@ -162,8 +162,9 @@ export async function getDistributorOrderAction(orderId: string) {
             ...order,
             totalAmount: Number(order.totalAmount),
             distributor: {
-                ...order.distributor,
+                ...(order.distributor as any),
                 creditLimit: Number(order.distributor.creditLimit || 0),
+                currentDebt: Number((order.distributor as any).currentDebt || 0),
             },
             orderItems: order.orderItems.map((oi: any) => ({
                 ...oi,

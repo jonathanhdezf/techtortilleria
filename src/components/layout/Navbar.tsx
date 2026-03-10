@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Terminal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/shared/Logo";
@@ -28,13 +28,13 @@ export default function Navbar() {
     return (
         <nav
             className={cn(
-                "fixed top-0 left-0 right-0 z-50 transition-all duration-500 px-6 py-4",
-                isScrolled ? "bg-neutral-black/80 backdrop-blur-2xl py-3 border-b border-white/5 shadow-2xl" : "bg-transparent"
+                "fixed top-0 left-0 right-0 z-[100] transition-all duration-500 max-w-[100vw] overflow-x-hidden",
+                isScrolled ? "bg-neutral-black/95 backdrop-blur-2xl py-3 border-b border-white/5 shadow-2xl" : "bg-transparent py-5"
             )}
         >
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link href="/" className="flex items-center group">
-                    <Logo className="h-10 md:h-12 w-auto" variant="premium" />
+            <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center justify-between gap-4">
+                <Link href="/" className="flex-shrink min-w-0 group">
+                    <Logo className="h-8 md:h-12 w-[160px] xs:w-[180px] md:w-auto object-contain" variant="premium" />
                 </Link>
 
                 {/* Desktop Nav */}
@@ -70,38 +70,44 @@ export default function Navbar() {
                     </div>
                 </div>
 
-                {/* Mobile Toggle */}
-                <button
-                    className="lg:hidden p-2 bg-white/5 rounded-xl border border-white/10 text-white"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                >
-                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </button>
+                {/* Mobile Toggle - High Visibility */}
+                <div className="lg:hidden flex items-center">
+                    <button
+                        className="p-3 bg-primary text-black rounded-xl shadow-xl shadow-primary/20 active:scale-90 transition-all flex items-center justify-center border-2 border-primary/20"
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        aria-label="Toggle Menu"
+                    >
+                        {mobileMenuOpen ? <X size={24} strokeWidth={3} /> : <Menu size={24} strokeWidth={3} />}
+                    </button>
+                </div>
             </div>
 
             {/* Mobile Menu */}
-            {mobileMenuOpen && (
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="lg:hidden absolute top-full left-0 right-0 bg-neutral-black/95 backdrop-blur-3xl border-b border-white/10 p-8 flex flex-col gap-6 shadow-2xl noise"
-                >
-                    {navLinks.map((link) => (
-                        <Link
-                            key={link.name}
-                            href={link.href}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className="text-xs font-black text-white/60 hover:text-primary uppercase tracking-[0.3em]"
-                        >
-                            {link.name}
-                        </Link>
-                    ))}
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-                        <Link href="/pos" className="text-[10px] font-black text-center py-4 bg-white/5 text-white rounded-2xl border border-white/10 uppercase tracking-widest">POS</Link>
-                        <Link href="/distribuidores" className="text-[10px] font-black text-center py-4 bg-primary text-black rounded-2xl uppercase tracking-widest">Acceso</Link>
-                    </div>
-                </motion.div>
-            )}
+            <AnimatePresence>
+                {mobileMenuOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="lg:hidden absolute top-full left-0 right-0 bg-neutral-black/98 backdrop-blur-3xl border-b border-white/10 p-6 md:p-8 flex flex-col gap-6 shadow-2xl noise w-screen md:w-full"
+                    >
+                        {navLinks.map((link) => (
+                            <Link
+                                key={link.name}
+                                href={link.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="text-xs font-black text-white/60 hover:text-primary uppercase tracking-[0.3em]"
+                            >
+                                {link.name}
+                            </Link>
+                        ))}
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                            <Link href="/pos" className="text-[10px] font-black text-center py-4 bg-white/5 text-white rounded-2xl border border-white/10 uppercase tracking-widest">POS</Link>
+                            <Link href="/distribuidores" className="text-[10px] font-black text-center py-4 bg-primary text-black rounded-2xl uppercase tracking-widest">Acceso</Link>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </nav>
     );
 }

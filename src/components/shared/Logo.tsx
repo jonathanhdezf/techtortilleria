@@ -1,9 +1,10 @@
 import React from 'react';
+import { cn } from "../../lib/utils";
 
 export default function Logo({ className, variant = 'default', isStatic = false }: { className?: string, variant?: 'default' | 'premium', isStatic?: boolean }) {
     if (variant === 'premium') {
         return (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 160" className={className}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 160" className={cn(className, "min-w-[120px]")}>
                 <defs>
                     <linearGradient id="premiumGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#FACC15" />
@@ -14,6 +15,11 @@ export default function Logo({ className, variant = 'default', isStatic = false 
                         <feComposite in="SourceGraphic" in2="blur" operator="over" />
                     </filter>
                 </defs>
+                <style>{`
+                    @media (max-width: 400px) {
+                        .logo-slogan { display: none; }
+                    }
+                `}</style>
                 <g className="premium-icon">
                     <rect x="20" y="30" width="100" height="100" rx="28" fill="url(#premiumGrad)" filter="url(#premiumGlow)" />
                     <path d="M 45 60 L 75 80 L 45 100" stroke="#18181B" strokeWidth="12" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -23,7 +29,7 @@ export default function Logo({ className, variant = 'default', isStatic = false 
                     <text x="0" y="0" className="font-sans font-black" fontSize="68" fill="white" letterSpacing="-2">
                         Tech<tspan fill="#FACC15">Tortillería</tspan>
                     </text>
-                    <text x="2" y="30" className="font-mono font-bold" fontSize="14" fill="#FACC15" opacity="0.6" letterSpacing="4">
+                    <text x="2" y="30" className="logo-slogan font-mono font-bold" fontSize="14" fill="#FACC15" opacity="0.6" letterSpacing="4">
                         &gt; EXECUTIVE TERMINAL _
                     </text>
                 </g>

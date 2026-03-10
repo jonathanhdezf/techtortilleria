@@ -201,6 +201,7 @@ export async function getDistributorOrdersAction(dateStr?: string) {
             distributor: {
                 ...o.distributor,
                 creditLimit: Number(o.distributor.creditLimit || 0),
+                currentDebt: Number(o.distributor.currentDebt || 0),
             },
             orderItems: o.orderItems.map((oi: any) => ({
                 ...oi,
@@ -310,7 +311,8 @@ export async function createProductAction(data: {
     unitType: string;
     stockQuantity: number;
     minimumStockAlert: number;
-    category?: string;
+    categoryName?: string;
+    categoryId?: string;
 }) {
     await ensureAdmin();
     try {
@@ -327,7 +329,8 @@ export async function createProductAction(data: {
                 unitType: data.unitType,
                 stockQuantity: data.stockQuantity,
                 minimumStockAlert: data.minimumStockAlert,
-                category: data.category || null,
+                categoryName: data.categoryName || null,
+                categoryId: data.categoryId || null,
             },
         });
 
@@ -348,7 +351,8 @@ export async function updateProductAction(
         priceDistributor: number;
         unitType: string;
         minimumStockAlert: number;
-        category?: string;
+        categoryName?: string;
+        categoryId?: string;
     }
 ) {
     await ensureAdmin();
@@ -362,7 +366,8 @@ export async function updateProductAction(
                 priceDistributor: data.priceDistributor,
                 unitType: data.unitType,
                 minimumStockAlert: data.minimumStockAlert,
-                category: data.category || null,
+                categoryName: data.categoryName || null,
+                categoryId: data.categoryId || null,
             },
         });
 
@@ -872,7 +877,8 @@ export async function getDistributorsAction() {
         `;
         return distributors.map(d => ({
             ...d,
-            creditLimit: Number(d.creditLimit)
+            creditLimit: Number(d.creditLimit),
+            currentDebt: Number(d.currentDebt || 0)
         }));
     } catch (error) {
         throw new Error("Error al obtener distribuidores");
@@ -938,5 +944,92 @@ export async function toggleDistributorActiveAction(id: string, active: boolean)
         return { success: true };
     } catch (error) {
         return { success: false, error: "Error al cambiar estado" };
+    }
+}
+
+// ==========================================
+// CATEGORÍAS (CRUD)
+// ==========================================
+
+export async function getCategoriesAction() {
+    await ensureAdmin();
+    try {
+        const categories = await prisma.category.findMany({
+            orderBy: { name: "asc" },
+        });
+        return categories.map(c => ({
+            ...c,
+            createdAt: c.createdAt,
+        }));
+    } catch (error) {
+        throw new Error("Error al obtener categorías");
+    }
+}
+
+export async function createCategoryAction(data: { name: string }) {
+    await ensureAdmin();
+    try {
+        const business = await prisma.business.findFirst();
+        if (!business) throw new Error("Business no encontrado");
+
+        await prisma.category.create({
+            data: {
+                businessId: business.id,
+                name: data.name,
+                active: true,
+            },
+        });
+
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error: any) {
+        if (error.code === 'P2002') return { success: false, error: "La categoría ya existe" };
+        return { success: false, error: "Error al crear categoría" };
+    }
+}
+
+export async function updateCategoryAction(id: string, name: string) {
+    await ensureAdmin();
+    try {
+        await prisma.category.update({
+            where: { id },
+            data: { name },
+        });
+
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al actualizar categoría" };
+    }
+}
+
+export async function toggleCategoryActiveAction(id: string, active: boolean) {
+    await ensureAdmin();
+    try {
+        await prisma.category.update({
+            where: { id },
+            data: { active },
+        });
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al cambiar estado" };
+    }
+}
+
+export async function deleteCategoryAction(id: string) {
+    await ensureAdmin();
+    try {
+        const productsCount = await prisma.product.count({ where: { categoryId: id } });
+        if (productsCount > 0) {
+            return { success: false, error: "No se puede eliminar una categoría que contiene productos." };
+        }
+
+        await prisma.category.delete({ where: { id } });
+
+        revalidatePath("/admin");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al eliminar la categoría" };
     }
 }

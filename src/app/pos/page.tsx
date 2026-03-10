@@ -31,7 +31,13 @@ export default async function POSPage() {
     // Fetch active products
     const products = await prisma.product.findMany({
         where: { active: true },
-        orderBy: { category: 'asc' }
+        orderBy: { categoryName: 'asc' }
+    })
+
+    // Fetch active categories
+    const categories = await prisma.category.findMany({
+        where: { active: true },
+        orderBy: { name: 'asc' }
     })
 
     const serializedProducts = products.map(p => ({
@@ -144,6 +150,8 @@ export default async function POSPage() {
         ...openRegister,
         openingAmount: Number(openRegister.openingAmount),
         closingAmount: openRegister.closingAmount ? Number(openRegister.closingAmount) : null,
+        discrepancyAmount: openRegister.discrepancyAmount ? Number(openRegister.discrepancyAmount) : null,
+        expectedAmount: openRegister.expectedAmount ? Number(openRegister.expectedAmount) : null,
     } : null
 
     return (
@@ -151,6 +159,7 @@ export default async function POSPage() {
             <CashRegisterModal isOpen={!openRegister} />
             <POSClient
                 products={serializedProducts}
+                categories={categories}
                 userId={dbUser.id}
                 userName={dbUser.name}
                 businessId={dbUser.businessId}

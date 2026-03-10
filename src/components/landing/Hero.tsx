@@ -22,21 +22,21 @@ export default function Hero() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2 }}
-                    className="inline-flex items-center gap-3 px-5 py-2 rounded-2xl bg-white/5 border border-white/10 text-primary text-[10px] font-black uppercase tracking-[0.4em] mb-10 shadow-2xl backdrop-blur-md"
+                    className="inline-flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 rounded-2xl bg-white/5 border border-white/10 text-primary text-[8px] xs:text-[10px] font-black uppercase tracking-[0.2em] xs:tracking-[0.4em] mb-10 shadow-2xl backdrop-blur-md max-w-full"
                 >
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                    Terminal de Grado Ejecutivo v2.0
+                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 bg-primary rounded-full animate-pulse flex-shrink-0" />
+                    <span className="truncate xs:whitespace-normal">Terminal de Grado Ejecutivo v2.0</span>
                 </motion.div>
 
                 {/* High-Impact Heading */}
-                <h1 className="text-5xl md:text-8xl font-black text-white leading-[0.9] mb-8 italic uppercase tracking-tighter">
-                    Re-imaginando la <br />
+                <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-8xl font-black text-white leading-[0.95] md:leading-[0.9] mb-8 italic uppercase tracking-tighter break-words overflow-hidden">
+                    Re-imaginando la <br className="hidden md:block" />
                     <span className="text-primary not-italic">Tradición.</span> <br />
                     <span className="text-white/20">Control Absoluto.</span>
                 </h1>
 
                 {/* Sales Copy */}
-                <p className="text-lg md:text-2xl text-white/50 mb-12 max-w-3xl mx-auto font-medium leading-relaxed tracking-tight">
+                <p className="text-base md:text-2xl text-white/50 mb-12 max-w-3xl mx-auto font-medium leading-relaxed tracking-tight px-2 md:px-0">
                     No es solo un punto de venta. Es una plataforma de <span className="text-white font-bold italic">alto rendimiento</span> diseñada para digitalizar, optimizar y escalar el alma de tu negocio.
                 </p>
 
@@ -66,11 +66,11 @@ export default function Hero() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.4 + (i * 0.1) }}
-                            className="p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center gap-2 backdrop-blur-sm"
+                            className="p-3 md:p-4 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center gap-1.5 md:gap-2 backdrop-blur-sm"
                         >
-                            <item.icon className="w-5 h-5 text-primary/40" />
-                            <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">{item.label}</span>
-                            <span className="text-[8px] font-black text-primary uppercase tracking-[0.3em] opacity-40">{item.status}</span>
+                            <item.icon className="w-4 h-4 md:w-5 md:h-5 text-primary/40" />
+                            <span className="text-[9px] md:text-[10px] font-black text-white/80 uppercase tracking-widest">{item.label}</span>
+                            <span className="text-[7px] md:text-[8px] font-black text-primary uppercase tracking-[0.3em] opacity-40">{item.status}</span>
                         </motion.div>
                     ))}
                 </div>

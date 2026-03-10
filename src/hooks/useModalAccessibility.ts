@@ -12,6 +12,10 @@ export function useModalAccessibility(isOpen: boolean, onClose: () => void) {
     useEffect(() => {
         if (!isOpen) return;
 
+        // Prevent body scroll when modal is open
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
         // Handle Escape key
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -32,6 +36,9 @@ export function useModalAccessibility(isOpen: boolean, onClose: () => void) {
         window.addEventListener('popstate', handlePopState);
 
         return () => {
+            // Restore body scroll
+            document.body.style.overflow = originalOverflow;
+
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('popstate', handlePopState);
 
