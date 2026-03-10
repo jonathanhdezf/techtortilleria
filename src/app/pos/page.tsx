@@ -41,27 +41,21 @@ export default async function POSPage() {
     })
 
     const serializedProducts = products.map(p => ({
-        ...p,
+        id: p.id,
+        name: p.name,
+        description: p.description,
         pricePublic: Number(p.pricePublic),
         priceDistributor: Number(p.priceDistributor),
+        unitType: p.unitType,
         stockQuantity: Number(p.stockQuantity),
-        minimumStockAlert: Number(p.minimumStockAlert)
+        minimumStockAlert: Number(p.minimumStockAlert),
+        categoryName: p.categoryName,
+        categoryId: p.categoryId,
+        active: p.active
     }))
 
     // Fetch shift summary if register is open
-    let shiftSummary: {
-        cashSales: number,
-        cardSales: number,
-        totalAbonos: number,
-        abonosList: any[],
-        totalExpenses: number,
-        expensesList: any[],
-        totalManualInflows: number,
-        inflowsList: any[],
-        totalVentas: number,
-        ventaMasGrande: number,
-        productoEstrella: string
-    } = {
+    let shiftSummary: any = {
         cashSales: 0,
         cardSales: 0,
         totalAbonos: 0,
@@ -74,20 +68,29 @@ export default async function POSPage() {
         ventaMasGrande: 0,
         productoEstrella: 'Ninguno'
     }
-    if (openRegister) {
-        const sales = await prisma.sale.findMany({
-            where: {
-                userId: dbUser.id,
-                createdAt: { gte: openRegister.openedAt }
-            }
-        })
 
-        const expenses = await prisma.expense.findMany({
-            where: {
-                cashRegisterId: openRegister.id
-            },
-            orderBy: { createdAt: 'desc' }
-        })
+    if (openRegister) {
+        const [sales, expenses, saleItems] = await Promise.all([
+            prisma.sale.findMany({
+                where: {
+                    userId: dbUser.id,
+                    createdAt: { gte: openRegister.openedAt }
+                }
+            }),
+            prisma.expense.findMany({
+                where: { cashRegisterId: openRegister.id },
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.saleItem.findMany({
+                where: {
+                    sale: {
+                        userId: dbUser.id,
+                        createdAt: { gte: openRegister.openedAt }
+                    }
+                },
+                include: { product: { select: { name: true } } }
+            })
+        ])
 
         const abonosDetail = await prisma.$queryRaw<any[]>`
             SELECT t.id, t.amount, t."createdAt", t.description, 
@@ -108,46 +111,60 @@ export default async function POSPage() {
             ORDER BY "createdAt" DESC
         `
 
-        const saleItems = await prisma.saleItem.findMany({
-            where: {
-                sale: {
-                    userId: dbUser.id,
-                    createdAt: { gte: openRegister.openedAt }
-                }
-            },
-            include: { product: true }
-        })
-
         // Group by product to find star product
         const productStats = saleItems.reduce((acc: any, item: any) => {
-            const name = item.product.name
+            const name = (item.product as any).name
             acc[name] = (acc[name] || 0) + Number(item.quantity)
             return acc
         }, {})
 
-        const productoEstrella = Object.entries(productStats).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'Ninguno'
+        const productoEstrella = Object.entries(productStats)
+            .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))[0]?.[0] || 'Ninguno'
+            
         const cashSales = sales.filter(s => s.paymentMethod === 'efectivo').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0)
-        const cardSales = sales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc: number, s: any) => acc + Number(s.totalAmount), 0)
+        const cardSales = sales.filter(s => s.paymentMethod === 'tarjeta').reduce((acc: number, s: any) => acc + Number(s.totalAmount) || 0, 0)
         const totalAbonos = abonosDetail.reduce((acc: number, a: any) => acc + Number(a.amount), 0)
         const totalManualInflows = inflowsDetail.reduce((acc: number, i: any) => acc + Number(i.amount), 0)
+
+        const ventaMasGrande = sales.reduce((max: number, s: any) => {
+            const val = Number(s.totalAmount)
+            return val > max ? val : max
+        }, 0)
 
         shiftSummary = {
             cashSales,
             cardSales,
             totalAbonos,
-            abonosList: abonosDetail.map(a => ({ ...a, amount: Number(a.amount) })),
+            abonosList: abonosDetail.map(a => ({ 
+                id: a.id, 
+                amount: Number(a.amount), 
+                description: a.description || '', 
+                createdAt: a.createdAt,
+                customerName: a.customerName || 'Cliente'
+            })),
             totalManualInflows,
-            inflowsList: inflowsDetail.map(i => ({ ...i, amount: Number(i.amount) })),
+            inflowsList: inflowsDetail.map(i => ({ 
+                id: i.id, 
+                amount: Number(i.amount), 
+                description: i.description || '', 
+                createdAt: i.createdAt 
+            })),
             totalExpenses: expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0),
-            expensesList: expenses.map((e: any) => ({ ...e, amount: Number(e.amount) })),
+            expensesList: expenses.map((e: any) => ({ 
+                id: e.id, 
+                amount: Number(e.amount), 
+                description: e.description || '', 
+                createdAt: e.createdAt 
+            })),
             totalVentas: cashSales + cardSales + totalAbonos + totalManualInflows,
-            ventaMasGrande: Math.max(0, ...sales.map(s => Number(s.totalAmount))),
+            ventaMasGrande,
             productoEstrella
         }
     }
 
     const serializedRegister = openRegister ? {
-        ...openRegister,
+        id: openRegister.id,
+        openedAt: openRegister.openedAt,
         openingAmount: Number(openRegister.openingAmount),
         closingAmount: openRegister.closingAmount ? Number(openRegister.closingAmount) : null,
         discrepancyAmount: openRegister.discrepancyAmount ? Number(openRegister.discrepancyAmount) : null,
