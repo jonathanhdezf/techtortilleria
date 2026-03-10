@@ -91,7 +91,7 @@ async function main() {
             unitType: "kg",
             stockQuantity: 500,
             minimumStockAlert: 50,
-            category: "tortilla",
+            categoryName: "tortilla",
         },
         {
             name: "Masa Blanca (Kg)",
@@ -101,7 +101,7 @@ async function main() {
             unitType: "kg",
             stockQuantity: 200,
             minimumStockAlert: 30,
-            category: "maiz",
+            categoryName: "maiz",
         },
         {
             name: "Totopos (Bolsa 500g)",
@@ -111,7 +111,7 @@ async function main() {
             unitType: "pieza",
             stockQuantity: 100,
             minimumStockAlert: 20,
-            category: "derivado",
+            categoryName: "derivado",
         },
         {
             name: "Tostadas Caseras (Paquete)",
@@ -121,14 +121,21 @@ async function main() {
             unitType: "pieza",
             stockQuantity: 80,
             minimumStockAlert: 15,
-            category: "derivado",
+            categoryName: "derivado",
         },
     ];
 
     for (const p of products) {
         await prisma.product.create({
             data: {
-                ...p,
+                name: p.name,
+                description: p.description,
+                pricePublic: p.pricePublic,
+                priceDistributor: p.priceDistributor,
+                unitType: p.unitType,
+                stockQuantity: p.stockQuantity,
+                minimumStockAlert: p.minimumStockAlert,
+                categoryName: p.categoryName as any,
                 businessId: business.id,
             },
         });
