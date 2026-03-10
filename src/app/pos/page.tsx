@@ -28,17 +28,15 @@ export default async function POSPage() {
         }
     })
 
-    // Fetch active products
-    const products = await prisma.product.findMany({
-        where: { active: true },
-        orderBy: { categoryName: 'asc' }
-    })
+    // Fetch active products using Raw SQL to bypass client sync issues
+    const products: any[] = await prisma.$queryRaw`
+        SELECT * FROM products WHERE active = true ORDER BY name ASC
+    `
 
-    // Fetch active categories
-    const categories = await prisma.category.findMany({
-        where: { active: true },
-        orderBy: { name: 'asc' }
-    })
+    // Fetch active categories using Raw SQL
+    const categories: any[] = await prisma.$queryRaw`
+        SELECT * FROM categories WHERE active = true ORDER BY name ASC
+    `
 
     const serializedProducts = products.map(p => ({
         id: p.id,
@@ -49,8 +47,8 @@ export default async function POSPage() {
         unitType: p.unitType,
         stockQuantity: Number(p.stockQuantity),
         minimumStockAlert: Number(p.minimumStockAlert),
-        categoryName: p.categoryName,
-        categoryId: p.categoryId,
+        categoryName: p.categoryName || p.category || '',
+        categoryId: p.categoryId || '',
         active: p.active
     }))
 

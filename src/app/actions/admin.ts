@@ -28,48 +28,27 @@ export async function getAdminMetricsAction() {
         const yesterdayStart = startOfDay(subDays(today, 1));
         const yesterdayEnd = endOfDay(subDays(today, 1));
 
-        // 1. Ventas de hoy (POS)
-        const todaySales = await prisma.sale.aggregate({
-            where: {
-                createdAt: { gte: start, lte: end },
-            },
-            _sum: { totalAmount: true },
-            _count: { id: true },
-        });
+        // 1. Ventas de hoy (POS y Distribuidores)
+        const [todaySalesRes, todayDistSalesRes] = await Promise.all([
+            prisma.$queryRaw<any[]>`SELECT SUM("totalAmount") as total, COUNT(id) as count FROM sales WHERE "createdAt" >= ${start} AND "createdAt" <= ${end}`,
+            prisma.$queryRaw<any[]>`SELECT SUM("totalAmount") as total FROM distributor_orders WHERE "createdAt" >= ${start} AND "createdAt" <= ${end} AND status = 'ENTREGADO'`
+        ]);
 
-        // 1b. Pedidos Distribuidores hoy (Solo entregados)
-        const todayDistOrders = await prisma.distributorOrder.aggregate({
-            where: {
-                createdAt: { gte: start, lte: end },
-                status: "ENTREGADO"
-            },
-            _sum: { totalAmount: true }
-        });
+        const todayAmount = Number(todaySalesRes[0]?.total || 0) + Number(todayDistSalesRes[0]?.total || 0);
+        const todayCount = Number(todaySalesRes[0]?.count || 0);
 
         // 2. Ventas de ayer para crecimiento
-        const yesterdaySales = await prisma.sale.aggregate({
-            where: {
-                createdAt: { gte: yesterdayStart, lte: yesterdayEnd },
-            },
-            _sum: { totalAmount: true },
-        });
+        const [yesterdaySalesRes, yesterdayDistSalesRes] = await Promise.all([
+            prisma.$queryRaw<any[]>`SELECT SUM("totalAmount") as total FROM sales WHERE "createdAt" >= ${yesterdayStart} AND "createdAt" <= ${yesterdayEnd}`,
+            prisma.$queryRaw<any[]>`SELECT SUM("totalAmount") as total FROM distributor_orders WHERE "createdAt" >= ${yesterdayStart} AND "createdAt" <= ${yesterdayEnd} AND status = 'ENTREGADO'`
+        ]);
 
-        const yesterdayDistOrders = await prisma.distributorOrder.aggregate({
-            where: {
-                createdAt: { gte: yesterdayStart, lte: yesterdayEnd },
-                status: "ENTREGADO"
-            },
-            _sum: { totalAmount: true }
-        });
+        const yesterdayAmount = Number(yesterdaySalesRes[0]?.total || 0) + Number(yesterdayDistSalesRes[0]?.total || 0);
+        const growth = yesterdayAmount > 0 ? ((todayAmount - yesterdayAmount) / yesterdayAmount) * 100 : 100;
 
-        // 3. Alertas de inventario
-        const stockAlerts = await prisma.product.count({
-            where: {
-                stockQuantity: {
-                    lte: prisma.product.fields.minimumStockAlert,
-                },
-            },
-        });
+        // 3. Alertas de inventario - Raw SQL comparison to be safe
+        const lowStockRes = await prisma.$queryRaw<any[]>`SELECT COUNT(id) as count FROM products WHERE active = true AND "stockQuantity" <= "minimumStockAlert"`;
+        const lowStockCount = Number(lowStockRes[0]?.count || 0);
 
         // 4. Datos para la gráfica (últimos 7 días)
         const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -84,31 +63,16 @@ export async function getAdminMetricsAction() {
         const chartData = await Promise.all(
             last7Days.map(async (day) => {
                 const [posSum, distSum] = await Promise.all([
-                    prisma.sale.aggregate({
-                        where: { createdAt: { gte: day.start, lte: day.end } },
-                        _sum: { totalAmount: true },
-                    }),
-                    prisma.distributorOrder.aggregate({
-                        where: {
-                            createdAt: { gte: day.start, lte: day.end },
-                            status: "ENTREGADO"
-                        },
-                        _sum: { totalAmount: true }
-                    })
+                    prisma.$queryRaw<any[]>`SELECT SUM("totalAmount") as total FROM sales WHERE "createdAt" >= ${day.start} AND "createdAt" <= ${day.end}`,
+                    prisma.$queryRaw<any[]>`SELECT SUM("totalAmount") as total FROM distributor_orders WHERE "createdAt" >= ${day.start} AND "createdAt" <= ${day.end} AND status = 'ENTREGADO'`
                 ]);
 
                 return {
                     name: day.label,
-                    revenue: Number(posSum._sum.totalAmount || 0) + Number(distSum._sum.totalAmount || 0),
+                    revenue: Number(posSum[0]?.total || 0) + Number(distSum[0]?.total || 0),
                 };
             })
         );
-
-        const todayAmount = Number(todaySales._sum.totalAmount || 0) + Number(todayDistOrders._sum.totalAmount || 0);
-        const yesterdayAmount = Number(yesterdaySales._sum.totalAmount || 0) + Number(yesterdayDistOrders._sum.totalAmount || 0);
-        const growth = yesterdayAmount > 0
-            ? ((todayAmount - yesterdayAmount) / yesterdayAmount) * 100
-            : 100;
 
         const inventory = await prisma.product.findMany({
             where: { active: true },
@@ -116,7 +80,6 @@ export async function getAdminMetricsAction() {
             take: 10
         });
 
-        // 5. Ventas por tipo de pago (POS) usando Raw SQL para evitar problemas de sincronización de Prisma
         const salesByType: any[] = await prisma.$queryRaw`
             SELECT "isCredit", SUM("totalAmount") as total
             FROM sales
@@ -129,11 +92,11 @@ export async function getAdminMetricsAction() {
 
         return {
             totalRevenue: todayAmount,
-            cashRevenue: cashPOS + Number(todayDistOrders._sum.totalAmount || 0),
+            cashRevenue: cashPOS + Number(todayDistSalesRes[0]?.total || 0),
             creditRevenue: creditPOS,
-            totalOrders: todaySales._count.id + (await prisma.distributorOrder.count({ where: { createdAt: { gte: start, lte: end } } })),
+            totalOrders: todayCount + (await prisma.distributorOrder.count({ where: { createdAt: { gte: start, lte: end } } })),
             activeDistributors: await prisma.distributor.count(),
-            lowStockCount: stockAlerts,
+            lowStockCount: lowStockCount,
             growth: Math.round(growth),
             chartData,
             inventory: inventory.map(p => ({
@@ -162,7 +125,7 @@ export async function getInventoryAction() {
             stock: Number(p.stockQuantity),
             minStock: Number(p.minimumStockAlert),
             unit: p.unitType,
-            category: p.category,
+            category: p.categoryName || '',
         }));
     } catch (error) {
         throw new Error("Error al obtener inventario");
@@ -293,7 +256,7 @@ export async function getProductsFullAction() {
             unitType: p.unitType,
             stockQuantity: Number(p.stockQuantity),
             minimumStockAlert: Number(p.minimumStockAlert),
-            category: p.category,
+            category: p.categoryName || '',
             active: p.active,
             createdAt: p.createdAt,
             businessId: p.businessId,
@@ -319,23 +282,14 @@ export async function createProductAction(data: {
         const business = await prisma.business.findFirst();
         if (!business) throw new Error("Business no encontrado");
 
-        const product = await prisma.product.create({
-            data: {
-                businessId: business.id,
-                name: data.name,
-                description: data.description || null,
-                pricePublic: data.pricePublic,
-                priceDistributor: data.priceDistributor,
-                unitType: data.unitType,
-                stockQuantity: data.stockQuantity,
-                minimumStockAlert: data.minimumStockAlert,
-                categoryName: data.categoryName || null,
-                categoryId: data.categoryId || null,
-            },
-        });
+        const productId = crypto.randomUUID();
+        await prisma.$executeRaw`
+            INSERT INTO products (id, "businessId", name, description, "pricePublic", "priceDistributor", "unitType", "stockQuantity", "minimumStockAlert", "categoryName", "categoryId", active, "createdAt")
+            VALUES (${productId}, ${business.id}, ${data.name}, ${data.description || null}, ${data.pricePublic}, ${data.priceDistributor}, ${data.unitType}, ${data.stockQuantity}, ${data.minimumStockAlert}, ${data.categoryName || null}, ${data.categoryId || null}, true, ${new Date()})
+        `;
 
         revalidatePath("/admin");
-        return { success: true, id: product.id };
+        return { success: true, id: productId };
     } catch (error) {
         console.error("Error al crear producto:", error);
         return { success: false, error: "Error al crear producto" };
@@ -357,19 +311,12 @@ export async function updateProductAction(
 ) {
     await ensureAdmin();
     try {
-        await prisma.product.update({
-            where: { id },
-            data: {
-                name: data.name,
-                description: data.description || null,
-                pricePublic: data.pricePublic,
-                priceDistributor: data.priceDistributor,
-                unitType: data.unitType,
-                minimumStockAlert: data.minimumStockAlert,
-                categoryName: data.categoryName || null,
-                categoryId: data.categoryId || null,
-            },
-        });
+        await prisma.$executeRaw`
+            UPDATE products
+            SET name = ${data.name}, description = ${data.description || null}, "pricePublic" = ${data.pricePublic}, "priceDistributor" = ${data.priceDistributor}, 
+                "unitType" = ${data.unitType}, "minimumStockAlert" = ${data.minimumStockAlert}, "categoryName" = ${data.categoryName || null}, "categoryId" = ${data.categoryId || null}
+            WHERE id = ${id}
+        `;
 
         revalidatePath("/admin");
         return { success: true };
@@ -954,10 +901,8 @@ export async function toggleDistributorActiveAction(id: string, active: boolean)
 export async function getCategoriesAction() {
     await ensureAdmin();
     try {
-        const categories = await prisma.category.findMany({
-            orderBy: { name: "asc" },
-        });
-        return categories.map(c => ({
+        const categories = await prisma.$queryRaw<any[]>`SELECT * FROM categories ORDER BY name ASC`;
+        return categories.map((c: any) => ({
             ...c,
             createdAt: c.createdAt,
         }));
@@ -972,13 +917,10 @@ export async function createCategoryAction(data: { name: string }) {
         const business = await prisma.business.findFirst();
         if (!business) throw new Error("Business no encontrado");
 
-        await prisma.category.create({
-            data: {
-                businessId: business.id,
-                name: data.name,
-                active: true,
-            },
-        });
+        await prisma.$executeRaw`
+            INSERT INTO categories (id, "businessId", name, active, "createdAt")
+            VALUES (${crypto.randomUUID()}, ${business.id}, ${data.name}, true, ${new Date()})
+        `;
 
         revalidatePath("/admin");
         return { success: true };
@@ -991,10 +933,7 @@ export async function createCategoryAction(data: { name: string }) {
 export async function updateCategoryAction(id: string, name: string) {
     await ensureAdmin();
     try {
-        await prisma.category.update({
-            where: { id },
-            data: { name },
-        });
+        await prisma.$executeRaw`UPDATE categories SET name = ${name} WHERE id = ${id}`;
 
         revalidatePath("/admin");
         return { success: true };
@@ -1006,10 +945,7 @@ export async function updateCategoryAction(id: string, name: string) {
 export async function toggleCategoryActiveAction(id: string, active: boolean) {
     await ensureAdmin();
     try {
-        await prisma.category.update({
-            where: { id },
-            data: { active },
-        });
+        await prisma.$executeRaw`UPDATE categories SET active = ${active} WHERE id = ${id}`;
         revalidatePath("/admin");
         return { success: true };
     } catch (error) {
@@ -1020,12 +956,13 @@ export async function toggleCategoryActiveAction(id: string, active: boolean) {
 export async function deleteCategoryAction(id: string) {
     await ensureAdmin();
     try {
-        const productsCount = await prisma.product.count({ where: { categoryId: id } });
+        const productsRes = await prisma.$queryRaw<any[]>`SELECT COUNT(id) as count FROM products WHERE "categoryId" = ${id}`;
+        const productsCount = Number(productsRes[0]?.count || 0);
         if (productsCount > 0) {
             return { success: false, error: "No se puede eliminar una categoría que contiene productos." };
         }
 
-        await prisma.category.delete({ where: { id } });
+        await prisma.$executeRaw`DELETE FROM categories WHERE id = ${id}`;
 
         revalidatePath("/admin");
         return { success: true };
