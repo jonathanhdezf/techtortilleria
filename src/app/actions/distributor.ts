@@ -17,7 +17,7 @@ export async function getDistributorProductsAction() {
             name: p.name,
             price: Number(p.priceDistributor),
             stock: Number(p.stockQuantity),
-            category: p.category,
+            category: p.categoryName || '',
             unit: p.unitType,
         }));
     } catch (error) {
