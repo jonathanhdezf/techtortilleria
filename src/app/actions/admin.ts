@@ -90,12 +90,15 @@ export async function getAdminMetricsAction() {
         const cashPOS = Number(salesByType.find(s => s.isCredit === false)?.total || 0);
         const creditPOS = Number(salesByType.find(s => s.isCredit === true)?.total || 0);
 
+        const totalDistOrdersRes = await prisma.$queryRaw<any[]>`SELECT COUNT(id) as count FROM distributor_orders WHERE "createdAt" >= ${start} AND "createdAt" <= ${end}`;
+        const activeDistributorsRes = await prisma.$queryRaw<any[]>`SELECT COUNT(id) as count FROM distributors`;
+
         return {
             totalRevenue: todayAmount,
             cashRevenue: cashPOS + Number(todayDistSalesRes[0]?.total || 0),
             creditRevenue: creditPOS,
-            totalOrders: todayCount + (await prisma.distributorOrder.count({ where: { createdAt: { gte: start, lte: end } } })),
-            activeDistributors: await prisma.distributor.count(),
+            totalOrders: todayCount + Number(totalDistOrdersRes[0]?.count || 0),
+            activeDistributors: Number(activeDistributorsRes[0]?.count || 0),
             lowStockCount: lowStockCount,
             growth: Math.round(growth),
             chartData,
