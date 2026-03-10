@@ -437,10 +437,59 @@ export default function POSClient({ products, categories, userId, userName, busi
     return (
         <div className="flex-1 flex flex-col w-full h-[100dvh] bg-neutral-black overflow-hidden relative noise">
             <nav className="relative z-[60] flex items-center justify-between px-8 py-4 bg-secondary/40 backdrop-blur-2xl border-b border-white/5 shrink-0">
-                <div className="flex items-center gap-12">
+                <div className="flex items-center gap-10">
                     <Logo className="h-10 md:h-12 w-auto" variant="premium" />
 
-                    <div className="hidden lg:flex items-center gap-8">
+                    <div className="hidden lg:flex items-center gap-10 border-l border-white/10 pl-10">
+                        <div className="flex flex-col">
+                            <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] mb-0.5">Terminal ID</span>
+                            <span className="text-sm font-black text-white italic uppercase tracking-tighter leading-none">
+                                {businessSettings?.terminalId || <div className="h-4 w-20 bg-white/5 animate-pulse rounded" />}
+                            </span>
+                        </div>
+                        <div className="flex flex-col border-l border-white/5 pl-10">
+                            <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] mb-0.5">Ubicación</span>
+                            <span className="text-sm font-black text-white italic uppercase tracking-tighter leading-none">
+                                {businessSettings?.terminalLocation || <div className="h-4 w-24 bg-white/5 animate-pulse rounded" />}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="hidden xl:flex items-center gap-10 border-l border-white/10 pl-10">
+                        <div className={cn(
+                            "flex items-center gap-3 border px-4 py-2 rounded-2xl backdrop-blur-md transition-colors",
+                            activeRegister ? "bg-emerald-500/5 border-emerald-500/10" : "bg-red-500/5 border-red-500/10"
+                        )}>
+                            <motion.div
+                                animate={activeRegister ? { opacity: [0.4, 1, 0.4], scale: [0.95, 1.05, 0.95] } : {}}
+                                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                className={cn(
+                                    "w-1 h-3.5 rounded-full",
+                                    activeRegister ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.4)]" : "bg-red-400"
+                                )}
+                            />
+                            <div className="flex flex-col leading-none">
+                                <span className={cn(
+                                    "text-[7px] font-black uppercase tracking-[0.2em]",
+                                    activeRegister ? "text-emerald-400/40" : "text-red-400/40"
+                                )}>Caja</span>
+                                <span className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest",
+                                    activeRegister ? "text-emerald-400" : "text-red-400"
+                                )}>
+                                    {businessSettings?.registerNumber || '1'} -
+                                </span>
+                            </div>
+                            <span className={cn(
+                                "text-[10px] font-black uppercase tracking-[0.1em] italic ml-1",
+                                activeRegister ? "text-emerald-400" : "text-red-400"
+                            )}>
+                                {activeRegister ? 'Abierta' : 'Cerrada'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="hidden lg:flex items-center gap-8 border-l border-white/10 pl-10">
                         <div className="hidden lg:flex items-center gap-6 bg-white/5 px-6 py-2.5 rounded-2xl border border-white/5 backdrop-blur-md">
                             <div className="flex items-center border-r border-white/10 pr-6 mr-2">
                                 <span className="text-lg font-black text-primary tabular-nums tracking-tighter">

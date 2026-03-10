@@ -32,6 +32,9 @@ model Business {
   products                 Product[]
   categories               Category[]
   sales                    Sale[]
+  terminalId               String              @default("POS-001-EXEC")
+  terminalLocation         String              @default("Planta Central")
+  registerNumber           String              @default("1")
   users                    User[]
 
   @@map("businesses")

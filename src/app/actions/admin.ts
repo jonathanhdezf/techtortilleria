@@ -973,3 +973,71 @@ export async function deleteCategoryAction(id: string) {
         return { success: false, error: "Error al eliminar la categoría" };
     }
 }
+
+// ==========================================
+// TERMINALES / CONFIGURACIÓN
+// ==========================================
+
+export async function getTerminalSettingsAction() {
+    await ensureAdmin();
+    try {
+        const results = await prisma.$queryRaw<any[]>`SELECT id, "terminalId", "terminalLocation", "registerNumber" FROM businesses LIMIT 1`;
+        const business = results[0];
+        if (!business) return null;
+
+        // Verificar si hay alguna caja abierta en el negocio
+        const activeRegister = await prisma.cashRegister.findFirst({
+            where: {
+                businessId: business.id,
+                closedAt: null
+            },
+            include: {
+                openedBy: {
+                    select: { name: true }
+                }
+            }
+        });
+
+        return {
+            terminalId: business.terminalId || "POS-001-EXEC",
+            terminalLocation: business.terminalLocation || "Planta Central",
+            registerNumber: business.registerNumber || "1",
+            isRegisterOpen: !!activeRegister,
+            activeRegister: activeRegister ? {
+                id: activeRegister.id,
+                openedBy: activeRegister.openedBy.name,
+                openedAt: activeRegister.openedAt,
+                openingAmount: Number(activeRegister.openingAmount)
+            } : null
+        };
+    } catch (error) {
+        throw new Error("Error al obtener configuración de terminal");
+    }
+}
+
+export async function updateTerminalSettingsAction(data: {
+    terminalId: string;
+    terminalLocation: string;
+    registerNumber: string;
+}) {
+    await ensureAdmin();
+    try {
+        const business = await prisma.business.findFirst();
+        if (!business) throw new Error("Negocio no encontrado");
+
+        await prisma.$executeRaw`
+            UPDATE businesses 
+            SET 
+                "terminalId" = ${data.terminalId},
+                "terminalLocation" = ${data.terminalLocation},
+                "registerNumber" = ${data.registerNumber}
+            WHERE id = ${business.id}
+        `;
+
+        revalidatePath("/admin");
+        revalidatePath("/pos");
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Error al actualizar configuración" };
+    }
+}

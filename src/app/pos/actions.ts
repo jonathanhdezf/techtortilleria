@@ -183,7 +183,7 @@ export async function createInflowAction(amount: number, description: string) {
 export async function getBusinessSettings() {
     const user = await getCurrentUser()
     const results = await prisma.$queryRaw<any[]>`
-        SELECT "volumeDiscountActive", "volumeDiscountThreshold", "volumeDiscountPercentage"
+        SELECT "volumeDiscountActive", "volumeDiscountThreshold", "volumeDiscountPercentage", "terminalId", "terminalLocation", "registerNumber"
         FROM businesses
         WHERE id = ${user.businessId}
         LIMIT 1
@@ -193,7 +193,10 @@ export async function getBusinessSettings() {
     return {
         ...business,
         volumeDiscountThreshold: Number(business?.volumeDiscountThreshold || 5),
-        volumeDiscountPercentage: Number(business?.volumeDiscountPercentage || 5)
+        volumeDiscountPercentage: Number(business?.volumeDiscountPercentage || 5),
+        terminalId: business?.terminalId || "POS-001-EXEC",
+        terminalLocation: business?.terminalLocation || "Planta Central",
+        registerNumber: business?.registerNumber || "1"
     }
 }
 

@@ -29,7 +29,8 @@ import {
     getProductsFullAction, getInventoryAction, getInventoryMovementsAction,
     updateProductAction, createProductAction, createInventoryMovementAction,
     updateOrderStatusAction, toggleProductActiveAction,
-    getCategoriesAction, createCategoryAction, updateCategoryAction, toggleCategoryActiveAction, deleteCategoryAction
+    getCategoriesAction, createCategoryAction, updateCategoryAction, toggleCategoryActiveAction, deleteCategoryAction,
+    getTerminalSettingsAction, updateTerminalSettingsAction
 } from "@/app/actions/admin";
 import { logoutAction } from "@/app/actions/auth";
 
@@ -105,6 +106,7 @@ export default function AdminClient() {
     const [cForm, setCForm] = useState({ name: "", phone: "", email: "", address: "", creditLimit: 0 });
     const [dForm, setDForm] = useState({ name: "", contactName: "", phone: "", email: "", address: "", creditLimit: 0 });
     const [catForm, setCatForm] = useState({ name: "" });
+    const [tForm, setTForm] = useState({ terminalId: "", terminalLocation: "", registerNumber: "" });
 
     // Modal accessibility hooks
     useModalAccessibility(productModal.open, () => setProductModal({ ...productModal, open: false }));
@@ -154,6 +156,16 @@ export default function AdminClient() {
             } else if (activeTab === "categorias") {
                 const catData = await getCategoriesAction();
                 setSecondaryData(catData);
+            } else if (activeTab === "terminales") {
+                const termData = await getTerminalSettingsAction();
+                setSecondaryData(termData);
+                if (termData) {
+                    setTForm({
+                        terminalId: termData.terminalId,
+                        terminalLocation: termData.terminalLocation,
+                        registerNumber: termData.registerNumber
+                    });
+                }
             }
         } catch (error) {
             console.error("Error loading admin data:", error);
@@ -395,6 +407,23 @@ export default function AdminClient() {
         } catch (e) { console.error(e); }
     };
 
+    const handleSaveTerminal = async () => {
+        setSaving(true);
+        try {
+            const res = await updateTerminalSettingsAction(tForm);
+            if (res.success) {
+                alert("Configuración actualizada correctamente");
+                loadData();
+            } else {
+                alert(res.error || "Error al actualizar");
+            }
+        } catch (e) {
+            alert("Error de conexión");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const openRegisterDetail = async (id: string) => {
         try {
             setIsDetailLoading(true);
@@ -506,6 +535,7 @@ export default function AdminClient() {
                             <AdminNavItem icon={<ClipboardList />} label="Control de Inventario" active={activeTab === "inventario"} onClick={() => switchTab("inventario")} />
                             <AdminNavItem icon={<Users />} label="Clientes" active={activeTab === "clientes"} onClick={() => switchTab("clientes")} />
                             <AdminNavItem icon={<UserCog />} label="Personal" active={activeTab === "usuarios"} onClick={() => switchTab("usuarios")} />
+                            <AdminNavItem icon={<Settings />} label="Terminales" active={activeTab === "terminales"} onClick={() => switchTab("terminales")} />
                         </nav>
                     </div>
 
@@ -1686,6 +1716,126 @@ export default function AdminClient() {
                                         <p className="text-[11px] font-black text-surface/20 uppercase tracking-[0.4em] italic">No hay categorías registradas</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === "terminales" && (
+                            <div className="space-y-12">
+                                <div className="px-6">
+                                    <h2 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter leading-none">Gestión de <span className="text-primary italic">Terminales</span></h2>
+                                    <div className="flex items-center gap-3 mt-4">
+                                        <div className="h-[1px] w-8 bg-primary/40" />
+                                        <p className="text-surface/30 font-black text-[10px] uppercase tracking-[0.3em]">Configuración de puntos de venta y cajas</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                    {/* Formulario de Configuración */}
+                                    <div className="bg-secondary/40 backdrop-blur-3xl p-10 rounded-[3.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+                                        <h3 className="text-xl font-black text-white uppercase tracking-widest mb-10 flex items-center gap-4">
+                                            <Settings className="w-6 h-6 text-primary" />
+                                            Parámetros del Terminal
+                                        </h3>
+                                        
+                                        <div className="space-y-8">
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">ID del Terminal</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all"
+                                                    value={tForm.terminalId}
+                                                    onChange={e => setTForm({...tForm, terminalId: e.target.value})}
+                                                    placeholder="POS-001-EXEC"
+                                                    title="Terminal ID"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Ubicación Física</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all"
+                                                    value={tForm.terminalLocation}
+                                                    onChange={e => setTForm({...tForm, terminalLocation: e.target.value})}
+                                                    placeholder="Planta Central"
+                                                    title="Ubicación"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[10px] font-black uppercase text-surface/20 mb-3 ml-6 tracking-[0.3em]">Número de Caja / Módulo</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full bg-white/5 border border-white/5 rounded-[2rem] px-8 py-5 text-lg font-black text-white outline-none focus:bg-white/10 focus:border-primary/40 transition-all"
+                                                    value={tForm.registerNumber}
+                                                    onChange={e => setTForm({...tForm, registerNumber: e.target.value})}
+                                                    placeholder="1"
+                                                    title="Caja"
+                                                />
+                                            </div>
+
+                                            <button
+                                                onClick={handleSaveTerminal}
+                                                disabled={saving}
+                                                className="w-full bg-primary text-secondary py-6 rounded-[2.5rem] font-black text-sm tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:grayscale mt-4"
+                                            >
+                                                {saving ? "GUARDANDO..." : "ACTUALIZAR CONFIGURACIÓN"}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Estado en Vivo de la Caja */}
+                                    <div className="bg-secondary/40 backdrop-blur-3xl p-10 rounded-[3.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+                                        <h3 className="text-xl font-black text-white uppercase tracking-widest mb-10 flex items-center gap-4">
+                                            <Scale className="w-6 h-6 text-primary" />
+                                            Estado Operativo
+                                        </h3>
+
+                                        <div className="flex flex-col items-center justify-center p-12 bg-white/5 rounded-[3rem] border border-white/5 text-center">
+                                            {secondaryData?.isRegisterOpen ? (
+                                                <>
+                                                    <div className="relative mb-8">
+                                                        <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center border border-emerald-500/20">
+                                                            <div className="w-12 h-12 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_30px_rgba(16,185,129,0.4)]" />
+                                                        </div>
+                                                        <div className="absolute -top-2 -right-2 bg-emerald-500 text-secondary text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest">LIVE</div>
+                                                    </div>
+                                                    <h4 className="text-3xl font-black text-emerald-400 uppercase italic tracking-tighter mb-4">Caja Abierta</h4>
+                                                    <div className="space-y-4 w-full">
+                                                        <div className="flex justify-between items-center py-4 border-b border-white/5">
+                                                            <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest">Operador</span>
+                                                            <span className="text-sm font-black text-white uppercase italic">{secondaryData.activeRegister.openedBy}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center py-4 border-b border-white/5">
+                                                            <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest">Iniciada a las</span>
+                                                            <span className="text-sm font-black text-white tabular-nums">{new Date(secondaryData.activeRegister.openedAt).toLocaleTimeString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center py-4">
+                                                            <span className="text-[10px] font-black text-surface/20 uppercase tracking-widest">Fondo Inicial</span>
+                                                            <span className="text-sm font-black text-primary tabular-nums">{formatCurrency(secondaryData.activeRegister.openingAmount)}</span>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center border border-white/5 mb-8">
+                                                        <X className="w-12 h-12 text-white/20" />
+                                                    </div>
+                                                    <h4 className="text-3xl font-black text-white/20 uppercase italic tracking-tighter mb-4">Caja Cerrada</h4>
+                                                    <p className="text-[10px] text-surface/20 font-black uppercase tracking-widest max-w-[200px]">No hay sesiones de venta activas en este terminal.</p>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-10 p-8 bg-primary/5 rounded-[2rem] border border-primary/10">
+                                            <div className="flex items-center gap-4 text-primary mb-4">
+                                                <AlertCircle className="w-5 h-5" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest">Aviso de Seguridad</span>
+                                            </div>
+                                            <p className="text-[9px] text-white/40 font-black uppercase leading-relaxed tracking-widest">Los cambios en el ID del terminal y la caja se reflejarán instantáneamente en la interfaz del punto de venta. Asegúrese de coordinar con el operador antes de realizar cambios estructurales.</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
