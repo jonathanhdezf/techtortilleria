@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils";
 export default function Logo({ className, variant = 'default', isStatic = false }: { className?: string, variant?: 'default' | 'premium', isStatic?: boolean }) {
     if (variant === 'premium') {
         return (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 160" className={cn(className, "min-w-[120px]")}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 180" className={cn(className, "min-w-[140px]")}>
                 <defs>
                     <linearGradient id="premiumGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#FACC15" />
@@ -14,8 +14,13 @@ export default function Logo({ className, variant = 'default', isStatic = false 
                         <feGaussianBlur stdDeviation="5" result="blur" />
                         <feComposite in="SourceGraphic" in2="blur" operator="over" />
                     </filter>
+                    <clipPath id="premiumTypewriterClip">
+                        <rect id="premiumTypeRect" x="0" y="-15" width="400" height="40" fill="white" />
+                    </clipPath>
                 </defs>
                 <style>{`
+                    @keyframes premiumTypewriter { 0% { transform: scaleX(0); } 40%, 90% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
+                    #premiumTypeRect { transform-origin: left; ${isStatic ? '' : 'animation: premiumTypewriter 5s steps(25) infinite;'} }
                     @media (max-width: 400px) {
                         .logo-slogan { display: none; }
                     }
@@ -26,11 +31,11 @@ export default function Logo({ className, variant = 'default', isStatic = false 
                     <rect x="85" y="95" width="20" height="12" rx="4" fill="#18181B" />
                 </g>
                 <g transform="translate(145, 100)">
-                    <text x="0" y="0" className="font-sans font-black" fontSize="68" fill="white" letterSpacing="-2">
+                    <text x="0" y="0" className="font-sans font-black" fontSize="72" fill="white" letterSpacing="-2">
                         Tech<tspan fill="#FACC15">Tortillería</tspan>
                     </text>
-                    <text x="2" y="30" className="logo-slogan font-mono font-bold" fontSize="14" fill="#FACC15" opacity="0.6" letterSpacing="4">
-                        &gt; EXECUTIVE TERMINAL _
+                    <text x="2" y="35" className="logo-slogan font-mono font-bold" fontSize="16" fill="#FACC15" opacity="0.6" letterSpacing="4" clipPath="url(#premiumTypewriterClip)">
+                        &gt; Iniciando_masa.exe _
                     </text>
                 </g>
             </svg>
