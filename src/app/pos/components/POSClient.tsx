@@ -85,6 +85,26 @@ export default function POSClient({ products, categories, userId, userName, busi
     const [isMounted, setIsMounted] = useState(false)
     const [isSurtirLoading, setIsSurtirLoading] = useState(false)
 
+    // Derived State
+    const currentTotal = businessSettings ? getTotal({
+        active: businessSettings.volumeDiscountActive,
+        threshold: businessSettings.volumeDiscountThreshold,
+        percentage: businessSettings.volumeDiscountPercentage
+    }) : getTotal()
+    const parsedCash = parseFloat(cashReceived) || 0
+    const change = parsedCash - currentTotal
+
+    const filteredProducts = products.filter(p => {
+        const matchesCategory = activeCategory === 'Todos' || p.categoryName === activeCategory
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        return matchesCategory && matchesSearch
+    })
+
+    const getRemainingStock = (p: any) => {
+        const item = items.find(i => i.id === p.id)
+        return p.stockQuantity - (item?.quantity || 0)
+    }
+
     // Modal Accessibility Hooks
     useModalAccessibility(isUserMenuOpen, () => setIsUserMenuOpen(false))
     useModalAccessibility(isSettingsOpen, () => setIsSettingsOpen(false))
@@ -97,16 +117,6 @@ export default function POSClient({ products, categories, userId, userName, busi
     useModalAccessibility(isShiftDetailsModalOpen, () => setIsShiftDetailsModalOpen(false))
     useModalAccessibility(isDistributorModalOpen, () => setIsDistributorModalOpen(false))
 
-    const filteredProducts = products.filter(p => {
-        const matchesCategory = activeCategory === 'Todos' || p.categoryName === activeCategory
-        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase())
-        return matchesCategory && matchesSearch
-    })
-
-    const getRemainingStock = (p: any) => {
-        const item = items.find(i => i.id === p.id)
-        return p.stockQuantity - (item?.quantity || 0)
-    }
 
     useEffect(() => {
         const savedDashboard = localStorage.getItem('pos_show_dashboard')
@@ -127,6 +137,29 @@ export default function POSClient({ products, categories, userId, userName, busi
         }
 
         function handleKeyDown(event: any) {
+            const isAnyModalOpen = isCheckoutModalOpen || isAmountModalOpen || isExpenseModalOpen || isCloseModalOpen || 
+                                 isCalendarOpen || isCustomerModalOpen || isInflowModalOpen || isShiftDetailsModalOpen || 
+                                 isDistributorModalOpen || isSupervisorModalOpen || isCreditPaymentModalOpen || 
+                                 isDistributorCreditPaymentModalOpen || isSettingsOpen || isUserMenuOpen;
+
+            if (event.key === "Escape") {
+                setCheckoutModalOpen(false);
+                setIsAmountModalOpen(false);
+                setIsExpenseModalOpen(false);
+                setIsCloseModalOpen(false);
+                setIsCalendarOpen(false);
+                setIsCustomerModalOpen(false);
+                setIsInflowModalOpen(false);
+                setIsShiftDetailsModalOpen(false);
+                setIsDistributorModalOpen(false);
+                setIsSupervisorModalOpen(false);
+                setIsCreditPaymentModalOpen(false);
+                setIsDistributorCreditPaymentModalOpen(false);
+                setIsSettingsOpen(false);
+                setIsUserMenuOpen(false);
+                return;
+            }
+
             if (isCheckoutModalOpen) {
                 if (!saleComplete) {
                     if (event.key === "F1") {
@@ -154,16 +187,34 @@ export default function POSClient({ products, categories, userId, userName, busi
                         finishSale(false);
                     }
                 }
+                return;
             }
 
-            if (event.key === "F12") {
-                event.preventDefault();
-                if (items.length > 0 && !loading && !isCheckoutModalOpen) {
-                    setCheckoutModalOpen(true);
+            if (!isAnyModalOpen) {
+                if (event.key === "F3") {
+                    event.preventDefault();
+                    const tortilla = products.find(p => p.name === "Tortilla de Maíz (Kg)");
+                    if (tortilla) {
+                        handleAddToCart(tortilla, 1);
+                    }
                 }
-            }
 
-            if (!isCheckoutModalOpen) {
+                if (event.key === "F4") {
+                    event.preventDefault();
+                    const tortilla = products.find(p => p.name === "Tortilla de Maíz (Kg)");
+                    if (tortilla) {
+                        setSelectedProductForAmount(tortilla);
+                        setIsAmountModalOpen(true);
+                    }
+                }
+
+                if (event.key === "F12") {
+                    event.preventDefault();
+                    if (items.length > 0 && !loading) {
+                        setCheckoutModalOpen(true);
+                    }
+                }
+
                 if (event.key === "+" || event.key === "-" || event.key === "Add" || event.key === "Subtract") {
                     const activeId = selectedItemId || (items.length > 0 ? items[items.length - 1].id : null);
                     if (activeId) {
@@ -172,9 +223,9 @@ export default function POSClient({ products, categories, userId, userName, busi
                             event.preventDefault();
                             const step = item.unitType === 'kg' ? 0.5 : 1;
                             if (event.key === "+" || event.key === "Add") {
-                                updateQuantity(activeId, item.quantity + step);
+                                handleUpdateQuantity(activeId, item.quantity + step);
                             } else {
-                                updateQuantity(activeId, Math.max(0, item.quantity - step));
+                                handleUpdateQuantity(activeId, Math.max(0, item.quantity - step));
                             }
                         }
                     }
@@ -185,6 +236,7 @@ export default function POSClient({ products, categories, userId, userName, busi
         const handleOnline = () => setIsOnline(true)
         const handleOffline = () => setIsOnline(false)
 
+        document.addEventListener("keydown", handleKeyDown)
         window.addEventListener('online', handleOnline)
         window.addEventListener('offline', handleOffline)
         setIsOnline(navigator.onLine)
@@ -201,7 +253,10 @@ export default function POSClient({ products, categories, userId, userName, busi
             window.removeEventListener('online', handleOnline)
             window.removeEventListener('offline', handleOffline)
         }
-    }, [items, loading, isCheckoutModalOpen, selectedItemId, businessId])
+    }, [items, loading, isCheckoutModalOpen, selectedItemId, businessId, paymentMethod, change, saleComplete,
+        isAmountModalOpen, isExpenseModalOpen, isCloseModalOpen, isCalendarOpen, isCustomerModalOpen,
+        isInflowModalOpen, isShiftDetailsModalOpen, isDistributorModalOpen, isSupervisorModalOpen,
+        isCreditPaymentModalOpen, isDistributorCreditPaymentModalOpen, isSettingsOpen, isUserMenuOpen, products])
 
     useEffect(() => {
         if (isOnline && offlineQueue.length > 0) {
@@ -245,13 +300,6 @@ export default function POSClient({ products, categories, userId, userName, busi
         loadSettings()
     }, [])
 
-    const currentTotal = businessSettings ? getTotal({
-        active: businessSettings.volumeDiscountActive,
-        threshold: businessSettings.volumeDiscountThreshold,
-        percentage: businessSettings.volumeDiscountPercentage
-    }) : getTotal()
-    const parsedCash = parseFloat(cashReceived) || 0
-    const change = parsedCash - currentTotal
 
     const handleCheckout = async () => {
         if (items.length === 0) return
@@ -422,14 +470,36 @@ export default function POSClient({ products, categories, userId, userName, busi
         setCashReceived('')
     }
 
+    const handleUpdateQuantity = (productId: string, newQty: number) => {
+        const product = products.find(p => p.id === productId)
+        if (!product) return
+
+        if (newQty > product.stockQuantity) {
+            alert(`⚠️ Stock insuficiente. Máximo disponible: ${product.stockQuantity} ${product.unitType}`)
+            return
+        }
+
+        updateQuantity(productId, newQty)
+    }
+
     const handleAddToCart = (p: any, qty: number = 1) => {
         const existing = items.find(i => i.id === p.id)
+        const currentQty = existing ? existing.quantity : 0
+        const totalNewQty = currentQty + qty
+
+        if (totalNewQty > p.stockQuantity) {
+            alert(`⚠️ Stock insuficiente. Disponible: ${p.stockQuantity} ${p.unitType}`)
+            return
+        }
+
         if (existing) {
-            updateQuantity(p.id, existing.quantity + qty)
+            handleUpdateQuantity(p.id, totalNewQty)
         } else {
             const cartProduct: CartProduct = { id: p.id, name: p.name, pricePublic: p.pricePublic, priceDistributor: p.priceDistributor, unitType: p.unitType }
             addItem(cartProduct)
-            if (qty !== 1) { useCartStore.getState().updateQuantity(p.id, qty) }
+            if (qty !== 1) { 
+                handleUpdateQuantity(p.id, qty)
+            }
         }
         setSelectedItemId(p.id)
     }
@@ -853,22 +923,36 @@ export default function POSClient({ products, categories, userId, userName, busi
                                                 {isKg ? (
                                                     <div className="flex flex-col gap-2">
                                                         <button
+                                                            disabled={remStock <= 0}
                                                             onClick={() => { setSelectedProductForAmount(p); setIsAmountModalOpen(true); }}
-                                                            className="w-full py-3.5 bg-white/5 hover:bg-white/10 text-primary border border-primary/20 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                                                            className="w-full py-3.5 bg-white/5 hover:bg-white/10 text-primary border border-primary/20 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30 disabled:grayscale"
                                                         >
                                                             Venta por Importe
                                                         </button>
                                                         <div className="flex gap-2">
-                                                            <button onClick={() => handleAddToCart(p, 0.5)} className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 active:scale-95">½ Kg</button>
-                                                            <button onClick={() => handleAddToCart(p, 1)} className="flex-1 py-4 bg-primary text-secondary rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all">1 Kg</button>
+                                                            <button 
+                                                                disabled={remStock < 0.5}
+                                                                onClick={() => handleAddToCart(p, 0.5)} 
+                                                                className="flex-1 py-4 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 active:scale-95 disabled:opacity-30"
+                                                            >
+                                                                ½ Kg
+                                                            </button>
+                                                            <button 
+                                                                disabled={remStock < 1}
+                                                                onClick={() => handleAddToCart(p, 1)} 
+                                                                className="flex-1 py-4 bg-primary text-secondary rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                                                            >
+                                                                1 Kg
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 ) : (
                                                     <button
+                                                        disabled={remStock <= 0}
                                                         onClick={() => handleAddToCart(p, 1)}
-                                                        className="w-full py-5 bg-primary text-secondary rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
+                                                        className="w-full py-5 bg-primary text-secondary rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/10 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:grayscale"
                                                     >
-                                                        <Plus className="w-4 h-4" /> AGREGAR A VENTA
+                                                        <Plus className="w-4 h-4" /> {remStock <= 0 ? 'AGOTADO' : 'AGREGAR A VENTA'}
                                                     </button>
                                                 )}
                                             </div>
@@ -910,11 +994,11 @@ export default function POSClient({ products, categories, userId, userName, busi
                                     <div className="relative z-10 flex items-center justify-between">
                                         <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.3em]">Cantidad</span>
                                         <div className="flex items-center gap-3 bg-secondary/80 p-1 rounded-2xl border border-white/5">
-                                            <button title="Reducir" onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - (item.unitType === 'kg' ? 0.5 : 1)))} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
+                                            <button title="Reducir" onClick={() => handleUpdateQuantity(item.id, Math.max(0, item.quantity - (item.unitType === 'kg' ? 0.5 : 1)))} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
                                                 <Minus className="w-3.5 h-3.5" />
                                             </button>
                                             <span className="w-8 text-center font-black text-base text-primary tabular-nums">{item.quantity}</span>
-                                            <button title="Aumentar" onClick={() => updateQuantity(item.id, item.quantity + (item.unitType === 'kg' ? 0.5 : 1))} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
+                                            <button title="Aumentar" onClick={() => handleUpdateQuantity(item.id, item.quantity + (item.unitType === 'kg' ? 0.5 : 1))} className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all active:scale-90">
                                                 <Plus className="w-3.5 h-3.5" />
                                             </button>
                                         </div>

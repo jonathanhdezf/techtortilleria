@@ -143,6 +143,7 @@ export default function Hero() {
                         {/* Close Button */}
                         <button
                             onClick={() => setShowPricingModal(false)}
+                            aria-label="Cerrar modal"
                             className="absolute top-6 right-6 z-50 w-12 h-12 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center text-white/40 hover:text-white transition-all"
                         >
                             <X className="w-5 h-5" />
