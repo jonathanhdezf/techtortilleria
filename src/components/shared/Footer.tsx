@@ -9,8 +9,8 @@ export default function Footer() {
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12 relative z-10">
                 <div className="flex flex-col items-center md:items-start gap-4">
                     <Logo className="h-10 w-auto" variant="premium" isStatic={true} />
-                    <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mt-2">
-                        Fiberlink Labs v2.0 © 2026 • Executive Terminal
+                    <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mt-2 group">
+                        <a href="https://fiberlinklabs.vercel.app/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Fiberlink Labs</a> © 2026 • Terminal Ejecutiva
                     </p>
                 </div>
 
