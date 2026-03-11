@@ -1,10 +1,47 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import Navbar from "@/components/layout/Navbar";
 import Hero from "@/components/landing/Hero";
 import Footer from "@/components/shared/Footer";
 import { Coffee, Truck, LayoutDashboard, Calculator, Mail, Phone, MapPin, Send } from "lucide-react";
 
 export default function Home() {
+  const [formData, setFormData] = useState({
+    name: "",
+    company: "",
+    message: ""
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const now = new Date();
+    const dateTime = now.toLocaleString('es-MX', { 
+      day: '2-digit', month: '2-digit', year: 'numeric', 
+      hour: '2-digit', minute: '2-digit', second: '2-digit' 
+    });
+    const folio = 'FL-' + Math.floor(Math.random() * 900000 + 100000);
+    
+    const whatsappMessage = `*SOLICITUD DE CONSULTORÍA EJECUTIVA*
+---------------------------------------
+*Folio:* ${folio}
+*Fecha/Hora:* ${dateTime}
+
+*Nombre:* ${formData.name}
+*Empresa:* ${formData.company}
+
+*Mensaje:* 
+${formData.message}
+
+---------------------------------------
+. Contactó con nuestro equipo de ingeniería técnica para una consultoría ejecutiva atraves de la pagina oficial.`;
+
+    const encodedMessage = encodeURIComponent(whatsappMessage);
+    const phoneNumber = "522331072438";
+    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
+  };
+
   return (
     <main className="min-h-screen bg-neutral-black">
       <Navbar />
@@ -122,22 +159,46 @@ export default function Home() {
           <div className="p-8 md:p-12 rounded-[40px] bg-white/5 border border-white/5 backdrop-blur-3xl shadow-2xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
 
-            <form className="relative z-10 space-y-6">
+            <form onSubmit={handleSubmit} className="relative z-10 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Nombre</label>
-                  <input type="text" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors" placeholder="Tu nombre" />
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors" 
+                    placeholder="Tu nombre" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Empresa</label>
-                  <input type="text" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors" placeholder="Nombre de tu negocio" />
+                  <input 
+                    type="text" 
+                    required
+                    value={formData.company}
+                    onChange={(e) => setFormData({...formData, company: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors" 
+                    placeholder="Nombre de tu negocio" 
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Mensaje</label>
-                <textarea rows={4} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none" placeholder="¿Cómo podemos ayudarte?" />
+                <textarea 
+                  rows={4} 
+                  required
+                  value={formData.message}
+                  onChange={(e) => setFormData({...formData, message: e.target.value})}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none" 
+                  placeholder="¿Cómo podemos ayudarte?" 
+                />
               </div>
-              <button className="w-full py-5 bg-primary text-black rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-white transition-all shadow-xl shadow-primary/10 group">
+              <button 
+                type="submit"
+                className="w-full py-5 bg-primary text-black rounded-2xl font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-white transition-all shadow-xl shadow-primary/10 group"
+              >
                 Enviar Solicitud
                 <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
               </button>
