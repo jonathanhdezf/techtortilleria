@@ -15,12 +15,20 @@ export default function Logo({ className, variant = 'default', isStatic = false 
                         <feComposite in="SourceGraphic" in2="blur" operator="over" />
                     </filter>
                     <clipPath id="premiumTypewriterClip">
-                        <rect id="premiumTypeRect" x="0" y="-15" width="400" height="40" fill="white" />
+                        <rect id="premiumTypeRect" x="0" y="10" width="450" height="40" fill="white" />
                     </clipPath>
                 </defs>
                 <style>{`
-                    @keyframes premiumTypewriter { 0% { transform: scaleX(0); } 40%, 90% { transform: scaleX(1); } 100% { transform: scaleX(0); } }
-                    #premiumTypeRect { transform-origin: left; ${isStatic ? '' : 'animation: premiumTypewriter 5s steps(25) infinite;'} }
+                    @keyframes premiumTypewriter { 
+                        0% { transform: scaleX(0); } 
+                        45%, 90% { transform: scaleX(1); } 
+                        100% { transform: scaleX(0); } 
+                    }
+                    #premiumTypeRect { 
+                        transform-origin: left; 
+                        transform-box: fill-box;
+                        ${isStatic ? '' : 'animation: premiumTypewriter 5s steps(30) infinite;'} 
+                    }
                     @media (max-width: 400px) {
                         .logo-slogan { display: none; }
                     }
