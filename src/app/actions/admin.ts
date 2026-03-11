@@ -90,12 +90,42 @@ export async function getAdminMetricsAction() {
         const cashPOS = Number(salesByType.find(s => s.isCredit === false)?.total || 0);
         const creditPOS = Number(salesByType.find(s => s.isCredit === true)?.total || 0);
 
+        // 5. Abonos (Pagos a deuda recibidos hoy)
+        const abonosRes = await prisma.$queryRaw<any[]>`
+            SELECT SUM(amount) as total FROM credit_transactions 
+            WHERE type = 'abonos' 
+            AND "createdAt" >= ${start} AND "createdAt" <= ${end}
+        `;
+        const totalAbonos = Number(abonosRes[0]?.total || 0);
+
+        // 6. Manual Inflows (Money added for change/adjustments)
+        const manualInflowsRes = await prisma.$queryRaw<any[]>`
+            SELECT SUM(amount) as total FROM cash_inflows 
+            WHERE "createdAt" >= ${start} AND "createdAt" <= ${end}
+        `;
+        const totalInflows = Number(manualInflowsRes[0]?.total || 0);
+
+        // 7. Expenses (Money taken out)
+        const expensesRes = await prisma.$queryRaw<any[]>`
+            SELECT SUM(amount) as total FROM expenses 
+            WHERE "createdAt" >= ${start} AND "createdAt" <= ${end}
+        `;
+        const totalExpenses = Number(expensesRes[0]?.total || 0);
+
         const totalDistOrdersRes = await prisma.$queryRaw<any[]>`SELECT COUNT(id) as count FROM distributor_orders WHERE "createdAt" >= ${start} AND "createdAt" <= ${end}`;
         const activeDistributorsRes = await prisma.$queryRaw<any[]>`SELECT COUNT(id) as count FROM distributors`;
 
+        // Note: Distributor orders are mostly credit unless marked as paid immediately
+        const distCashRes = await prisma.$queryRaw<any[]>`
+            SELECT SUM("totalAmount") as total FROM distributor_orders 
+            WHERE "createdAt" >= ${start} AND "createdAt" <= ${end} 
+            AND status = 'ENTREGADO' AND "isPaid" = true AND "paymentMethod" = 'EFECTIVO'
+        `;
+        const distCash = Number(distCashRes[0]?.total || 0);
+
         return {
             totalRevenue: todayAmount,
-            cashRevenue: cashPOS + Number(todayDistSalesRes[0]?.total || 0),
+            cashRevenue: cashPOS + distCash + totalAbonos + totalInflows - totalExpenses,
             creditRevenue: creditPOS,
             totalOrders: todayCount + Number(totalDistOrdersRes[0]?.count || 0),
             activeDistributors: Number(activeDistributorsRes[0]?.count || 0),
@@ -593,7 +623,7 @@ export async function getRegisterDetailsAction(registerId: string) {
         const registerData = registers[0];
         const endTime = registerData.closedAt || new Date();
 
-        // 2. Ventas
+        // 2. Ventas POS (Diferenciando efectivo y crédito)
         const sales: any[] = await prisma.$queryRaw`
             SELECT s.*, c.name as "customerName"
             FROM sales s
@@ -602,6 +632,17 @@ export async function getRegisterDetailsAction(registerId: string) {
             AND s."createdAt" >= ${registerData.openedAt}
             AND s."createdAt" <= ${endTime}
             ORDER BY s."createdAt" DESC
+        `;
+
+        // 2b. Pedidos de Distribuidores durante el turno
+        const distSales: any[] = await prisma.$queryRaw`
+            SELECT o.*, d.name as "distributorName"
+            FROM distributor_orders o
+            JOIN distributors d ON o."distributorId" = d.id
+            WHERE o."status" = 'ENTREGADO'
+            AND o."createdAt" >= ${registerData.openedAt}
+            AND o."createdAt" <= ${endTime}
+            ORDER BY o."createdAt" DESC
         `;
 
         // 3. Gastos
@@ -618,15 +659,21 @@ export async function getRegisterDetailsAction(registerId: string) {
             ORDER BY "createdAt" DESC
         `;
 
-        // 5. Abonos de clientes
+        // 5. Abonos de clientes y distribuidores
         const abonos: any[] = await prisma.$queryRaw`
-            SELECT t.id, t.amount, t."createdAt", t.description, c.name as "customerName"
+            SELECT 
+                t.id, 
+                t.amount as "amount", 
+                t."createdAt", 
+                t.description, 
+                c.name as "customerName",
+                d.name as "distributorName"
             FROM credit_transactions t
-            JOIN customers c ON t."customerId" = c.id
+            LEFT JOIN customers c ON t."customerId" = c.id
+            LEFT JOIN distributors d ON t."distributorId" = d.id
             WHERE t.type = 'abonos'
             AND t."createdAt" >= ${registerData.openedAt}
             AND t."createdAt" <= ${endTime}
-            AND c."businessId" = ${registerData.businessId}
             ORDER BY t."createdAt" DESC
         `;
 
@@ -641,6 +688,7 @@ export async function getRegisterDetailsAction(registerId: string) {
                 closedBy: registerData.closedByName ? { name: registerData.closedByName, email: registerData.closedByEmail } : null
             },
             sales: sales.map(s => ({ ...s, totalAmount: Number(s.totalAmount) })),
+            distSales: distSales.map(o => ({ ...o, totalAmount: Number(o.totalAmount) })),
             expenses: expenses.map(e => ({ ...e, amount: Number(e.amount) })),
             inflows: inflows.map(i => ({ ...i, amount: Number(i.amount) })),
             abonos: abonos.map(a => ({ ...a, amount: Number(a.amount) }))
@@ -674,7 +722,48 @@ export async function getSalesAction(dateStr?: string) {
                 LIMIT 200
             `;
 
-        // We still need to fetch items for each sale. For simplicity in this large file:
+        // 2. We also fetch payments (abonos) to show them in the general sales list
+        const abonos: any[] = dateStr
+            ? await prisma.$queryRaw`
+                SELECT t.id, t.amount as "totalAmount", t."createdAt", t.description as "paymentMethod", 
+                       c.name as "customerName", d.name as "distributorName"
+                FROM credit_transactions t
+                LEFT JOIN customers c ON t."customerId" = c.id
+                LEFT JOIN distributors d ON t."distributorId" = d.id
+                WHERE t.type = 'abonos'
+                AND t."createdAt"::date = ${dateStr}::date
+                ORDER BY t."createdAt" DESC
+                LIMIT 100
+            `
+            : await prisma.$queryRaw`
+                SELECT t.id, t.amount as "totalAmount", t."createdAt", t.description as "paymentMethod", 
+                       c.name as "customerName", d.name as "distributorName"
+                FROM credit_transactions t
+                LEFT JOIN customers c ON t."customerId" = c.id
+                LEFT JOIN distributors d ON t."distributorId" = d.id
+                WHERE t.type = 'abonos'
+                ORDER BY t."createdAt" DESC
+                LIMIT 100
+            `;
+
+        // We wrap abonos as virtual sales
+        const virtualSales = abonos.map(a => ({
+            ...a,
+            totalAmount: Number(a.totalAmount),
+            paymentMethod: `ABONO: ${a.paymentMethod || 'SIN DESC'}`,
+            userName: "SISTEMA",
+            customerName: a.customerName || a.distributorName || "CLIENTE/DIST",
+            isAbono: true,
+            saleItems: [{
+                id: a.id,
+                quantity: 1,
+                unitPrice: Number(a.totalAmount),
+                subtotal: Number(a.totalAmount),
+                product: { name: "ABONO / PAGO A CUENTA", unitType: "PAGO" }
+            }]
+        }));
+
+        // We still need to fetch items for each real sale
         const enrichedSales = await Promise.all(sales.map(async (s) => {
             const items = await prisma.saleItem.findMany({
                 where: { saleId: s.id },
@@ -701,7 +790,12 @@ export async function getSalesAction(dateStr?: string) {
             };
         }));
 
-        return enrichedSales;
+        // Merge and sort everything by date
+        const allTransactions = [...enrichedSales, ...virtualSales].sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        return allTransactions;
     } catch (error) {
         console.error("Error fetching sales history:", error);
         throw new Error("Error al obtener historial de ventas");

@@ -50,11 +50,13 @@ export async function searchCustomers(query: string) {
 export async function addCreditPayment(customerId: string, amount: number, description: string) {
     const user = await getCurrentUser()
 
+    // 1. Record credit transaction
     await prisma.$executeRaw`
         INSERT INTO credit_transactions (id, "customerId", amount, type, description, "createdAt")
         VALUES (${crypto.randomUUID()}, ${customerId}, ${amount}, 'abonos', ${description}, ${new Date()})
     `
 
+    // 2. Update customer debt
     await prisma.$executeRaw`
         UPDATE customers
         SET "currentDebt" = "currentDebt" - ${amount}

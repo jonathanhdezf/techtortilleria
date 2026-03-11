@@ -801,19 +801,25 @@ export default function AdminClient() {
                                             {secondaryData && secondaryData.slice(0, visibleSalesCount).map((sale: any) => (
                                                 <div key={sale.id} className="bg-secondary/40 backdrop-blur-3xl p-6 md:p-10 rounded-[2.5rem] border border-white/5 flex flex-col md:flex-row justify-between items-center gap-8 group hover:border-primary/20 transition-all shadow-xl">
                                                     <div className="flex items-center gap-8 flex-1 w-full">
-                                                        <div className="w-20 h-20 rounded-[2rem] bg-emerald-500/10 flex items-center justify-center shadow-xl border border-emerald-500/10 transform group-hover:rotate-12 group-hover:scale-105 transition-all duration-500 text-emerald-400 shrink-0">
-                                                            <History className="w-10 h-10" />
+                                                        <div className={cn(
+                                                            "w-20 h-20 rounded-[2rem] flex items-center justify-center shadow-xl border transform group-hover:rotate-12 group-hover:scale-105 transition-all duration-500 shrink-0",
+                                                            sale.isAbono ? "bg-blue-500/10 text-blue-400 border-blue-500/10" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/10"
+                                                        )}>
+                                                            {sale.isAbono ? <CreditCard className="w-10 h-10" /> : <History className="w-10 h-10" />}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-4 mb-3 flex-wrap">
                                                                 <span className="font-mono text-[10px] font-black text-surface/20 uppercase tracking-tighter bg-white/5 px-3 py-1 rounded-lg border border-white/5">#{sale.id.slice(-8).toUpperCase()}</span>
-                                                                <div className="px-4 py-1.5 bg-primary text-secondary rounded-full text-[9px] font-black uppercase tracking-[0.1em] shadow-lg shadow-primary/10 italic">VENTA POS</div>
+                                                                <div className={cn(
+                                                                    "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.1em] shadow-lg italic",
+                                                                    sale.isAbono ? "bg-blue-500 text-white shadow-blue-500/10" : "bg-primary text-secondary shadow-primary/10"
+                                                                )}>{sale.isAbono ? "ABONO / PAGO" : "VENTA POS"}</div>
                                                             </div>
                                                             <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-12">
                                                                 <div className="flex flex-col min-w-0">
                                                                     <span className="text-xl font-black text-white group-hover:text-primary transition-colors flex items-center gap-2 truncate">
-                                                                        {sale.user?.name || "Sistema"}
-                                                                        {sale.customer && (
+                                                                        {sale.isAbono ? (sale.customerName || "CLIENTE") : (sale.user?.name || "SISTEMA")}
+                                                                        {!sale.isAbono && sale.customer && (
                                                                             <span className="text-[10px] bg-white/10 px-3 py-1 rounded-lg text-surface/30 truncate max-w-[120px]">
                                                                                 PARA: {sale.customer.name.toUpperCase()}
                                                                             </span>
@@ -829,8 +835,11 @@ export default function AdminClient() {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex flex-col shrink-0">
-                                                                    <span className="text-2xl font-black text-emerald-400 tabular-nums tracking-tighter">{formatCurrency(sale.totalAmount)}</span>
-                                                                    <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em] mt-1">{sale.saleItems?.length} Productos</span>
+                                                                    <span className={cn(
+                                                                        "text-2xl font-black tabular-nums tracking-tighter",
+                                                                        sale.isAbono ? "text-blue-400" : "text-emerald-400"
+                                                                    )}>{formatCurrency(sale.totalAmount)}</span>
+                                                                    <span className="text-[10px] font-black text-surface/20 uppercase tracking-[0.2em] mt-1">{sale.saleItems?.length} {sale.isAbono ? "Concepto" : "Productos"}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1369,9 +1378,16 @@ export default function AdminClient() {
                                                 )}>{d.active ? "ACTIVO" : "INACTIVO"}</span>
                                             </div>
 
-                                            <div className="grid grid-cols-1 gap-4 mb-8">
+                                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                                <div className="bg-white/5 p-5 rounded-[2rem] border border-white/5">
+                                                    <p className="text-[9px] font-black text-surface/30 uppercase mb-2 tracking-widest text-center">Saldo Deudor</p>
+                                                    <p className={cn(
+                                                        "text-xl font-black text-center tracking-tighter tabular-nums",
+                                                        d.currentDebt > 0 ? "text-accent" : "text-white/40"
+                                                    )}>{formatCurrency(d.currentDebt)}</p>
+                                                </div>
                                                 <div className="bg-primary/5 p-5 rounded-[2rem] border border-primary/10">
-                                                    <p className="text-[9px] font-black text-primary/40 uppercase mb-2 tracking-widest text-center">Límite de Crédito</p>
+                                                    <p className="text-[9px] font-black text-primary/40 uppercase mb-2 tracking-widest text-center">Límite</p>
                                                     <p className="text-xl font-black text-primary text-center tracking-tighter tabular-nums">{formatCurrency(d.creditLimit)}</p>
                                                 </div>
                                             </div>
@@ -2295,23 +2311,45 @@ export default function AdminClient() {
 
                                     <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar text-white bg-gradient-to-b from-transparent to-black/20">
                                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                            <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-primary/20 transition-all">
-                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Ventas Netas</p>
-                                                <p className="text-3xl font-black text-white tabular-nums tracking-tighter">{formatCurrency(registerDetailModal.data.sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0))}</p>
-                                            </div>
-                                            <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-accent/20 transition-all">
-                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Total Gastos</p>
-                                                <p className="text-3xl font-black text-accent tabular-nums tracking-tighter">{formatCurrency(registerDetailModal.data.expenses.reduce((acc: number, e: any) => acc + e.amount, 0))}</p>
-                                            </div>
                                             <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-emerald-500/20 transition-all">
-                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Corte Real</p>
-                                                <p className="text-3xl font-black text-emerald-400 tabular-nums tracking-tighter">{formatCurrency(registerDetailModal.data.register.closingAmount || 0)}</p>
+                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Efectivo en Caja</p>
+                                                <p className="text-3xl font-black text-emerald-400 tabular-nums tracking-tighter">
+                                                    {formatCurrency(
+                                                        registerDetailModal.data.sales.filter((s: any) => !s.isCredit).reduce((acc: number, s: any) => acc + s.totalAmount, 0) + 
+                                                        registerDetailModal.data.distSales.filter((o: any) => o.isPaid && o.paymentMethod === 'EFECTIVO').reduce((acc: number, o: any) => acc + o.totalAmount, 0) +
+                                                        registerDetailModal.data.abonos.reduce((acc: number, a: any) => acc + a.amount, 0) +
+                                                        registerDetailModal.data.inflows.reduce((acc: number, i: any) => acc + i.amount, 0) -
+                                                        registerDetailModal.data.expenses.reduce((acc: number, e: any) => acc + e.amount, 0)
+                                                    )}
+                                                </p>
+                                                <p className="text-[9px] font-black text-white/20 uppercase mt-2 ml-2 tracking-widest">(EFECTIVO + ABONOS + ENTRADAS - GASTOS)</p>
                                             </div>
                                             <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-blue-500/20 transition-all">
-                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Diferencia</p>
-                                                <p className={cn("text-3xl font-black tabular-nums tracking-tighter", registerDetailModal.data.register.discrepancyAmount >= 0 ? "text-blue-400" : "text-accent")}>
+                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Ventas a Crédito</p>
+                                                <p className="text-3xl font-black text-blue-400 tabular-nums tracking-tighter">
+                                                    {formatCurrency(
+                                                        registerDetailModal.data.sales.filter((s: any) => s.isCredit).reduce((acc: number, s: any) => acc + s.totalAmount, 0) +
+                                                        registerDetailModal.data.distSales.filter((o: any) => !o.isPaid).reduce((acc: number, o: any) => acc + o.totalAmount, 0)
+                                                    )}
+                                                </p>
+                                                <p className="text-[9px] font-black text-white/20 uppercase mt-2 ml-2 tracking-widest">(VENTAS AL FIADO DEL TURNO)</p>
+                                            </div>
+                                            <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-primary/20 transition-all">
+                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Venta Total Bruta</p>
+                                                <p className="text-3xl font-black text-white tabular-nums tracking-tighter">
+                                                    {formatCurrency(
+                                                        registerDetailModal.data.sales.reduce((acc: number, s: any) => acc + s.totalAmount, 0) +
+                                                        registerDetailModal.data.distSales.reduce((acc: number, o: any) => acc + o.totalAmount, 0)
+                                                    )}
+                                                </p>
+                                                <p className="text-[9px] font-black text-white/20 uppercase mt-2 ml-2 tracking-widest">(EFECTIVO + CRÉDITO - SIN ABONOS)</p>
+                                            </div>
+                                            <div className="bg-white/5 p-8 rounded-[3rem] border border-white/5 shadow-xl group hover:border-accent/20 transition-all">
+                                                <p className="text-[10px] font-black text-surface/20 uppercase tracking-[0.3em] mb-3 ml-2">Diferencia Final</p>
+                                                <p className={cn("text-3xl font-black tabular-nums tracking-tighter", registerDetailModal.data.register.discrepancyAmount >= 0 ? "text-primary" : "text-accent")}>
                                                     {formatCurrency(registerDetailModal.data.register.discrepancyAmount || 0)}
                                                 </p>
+                                                <p className="text-[9px] font-black text-white/20 uppercase mt-2 ml-2 tracking-widest">(EFECTIVO REAL VS ESPERADO)</p>
                                             </div>
                                         </div>
 
@@ -2323,12 +2361,12 @@ export default function AdminClient() {
                                                 </div>
                                                 <div className="bg-white/[0.02] rounded-[3rem] border border-white/5 overflow-hidden">
                                                     <div className="max-h-72 overflow-y-auto custom-scrollbar">
-                                                        {registerDetailModal.data.sales.length > 0 ? (
+                                                        {registerDetailModal.data.sales.length > 0 || registerDetailModal.data.distSales.length > 0 ? (
                                                             <table className="w-full text-left border-collapse">
                                                                 <thead className="bg-white/5">
                                                                     <tr>
-                                                                        <th className="px-8 py-5 text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Cliente / Detalle</th>
-                                                                        <th className="px-8 py-5 text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Método</th>
+                                                                        <th className="px-8 py-5 text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Origen / Cliente</th>
+                                                                        <th className="px-8 py-5 text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Estado</th>
                                                                         <th className="px-8 py-5 text-right text-[9px] font-black text-surface/20 uppercase tracking-[0.4em]">Monto</th>
                                                                     </tr>
                                                                 </thead>
@@ -2336,20 +2374,44 @@ export default function AdminClient() {
                                                                     {registerDetailModal.data.sales.map((s: any) => (
                                                                         <tr key={s.id} className="hover:bg-white/5 transition-colors">
                                                                             <td className="px-8 py-5">
-                                                                                <p className="font-black text-white text-sm uppercase tracking-tight">{s.customerName || "Mostrador / Público General"}</p>
-                                                                                <p className="text-[9px] text-surface/20 uppercase mt-1 tracking-widest leading-none">{new Date(s.createdAt).toLocaleTimeString()}</p>
+                                                                                <p className="font-black text-white text-sm uppercase tracking-tight">{s.customerName || "Venta de Mostrador"}</p>
+                                                                                <p className="text-[9px] text-surface/20 uppercase mt-1 tracking-widest leading-none">POS • {new Date(s.createdAt).toLocaleTimeString()}</p>
                                                                             </td>
                                                                             <td className="px-8 py-5">
-                                                                                <span className="text-[9px] font-black px-3 py-1 rounded-full bg-white/5 text-surface/30 uppercase tracking-widest">{s.paymentMethod}</span>
+                                                                                <span className={cn(
+                                                                                    "text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest",
+                                                                                    s.isCredit ? "bg-blue-500/10 text-blue-400 border border-blue-500/10" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/10"
+                                                                                )}>
+                                                                                    {s.isCredit ? "FÍADO / CRÉDITO" : "EFECTIVO"}
+                                                                                </span>
                                                                             </td>
                                                                             <td className="px-8 py-5 text-right font-black text-white text-lg tabular-nums">
                                                                                 {formatCurrency(s.totalAmount)}
                                                                             </td>
                                                                         </tr>
                                                                     ))}
+                                                                    {registerDetailModal.data.distSales.map((o: any) => (
+                                                                        <tr key={o.id} className="hover:bg-white/5 transition-colors">
+                                                                            <td className="px-8 py-5">
+                                                                                <p className="font-black text-primary text-sm uppercase tracking-tight">{o.distributorName || "Distribuidor"}</p>
+                                                                                <p className="text-[9px] text-surface/20 uppercase mt-1 tracking-widest leading-none">PEDIDO • {new Date(o.createdAt).toLocaleTimeString()}</p>
+                                                                            </td>
+                                                                            <td className="px-8 py-5">
+                                                                                <span className={cn(
+                                                                                    "text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest",
+                                                                                    !o.isPaid ? "bg-blue-500/10 text-blue-400 border border-blue-500/10" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/10"
+                                                                                )}>
+                                                                                    {!o.isPaid ? "CRÉDITO DIST." : "PAGADO"}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="px-8 py-5 text-right font-black text-white text-lg tabular-nums">
+                                                                                {formatCurrency(o.totalAmount)}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
                                                                 </tbody>
                                                             </table>
-                                                        ) : <p className="p-16 text-center text-surface/10 text-xs font-black uppercase tracking-[0.3em] italic">Sin ventas en este periodo</p>}
+                                                        ) : <p className="p-16 text-center text-surface/10 text-xs font-black uppercase tracking-[0.3em] italic">Sin ventas registradas en este turno</p>}
                                                     </div>
                                                 </div>
                                             </section>
@@ -2401,7 +2463,7 @@ export default function AdminClient() {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                                     {registerDetailModal.data.abonos.map((a: any) => (
                                                         <div key={a.id} className="bg-blue-500/5 p-8 rounded-[2.5rem] border border-blue-500/20 shadow-xl group hover:bg-blue-500/10 transition-all">
-                                                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 ml-2">{a.customerName}</p>
+                                                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4 ml-2">{a.customerName || a.distributorName || "DISTRIBUIDOR"}</p>
                                                             <div className="flex justify-between items-end">
                                                                 <div>
                                                                     <p className="text-2xl font-black text-white tabular-nums tracking-tighter">{formatCurrency(a.amount)}</p>

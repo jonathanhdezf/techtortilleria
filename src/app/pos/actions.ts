@@ -204,12 +204,14 @@ export async function recordDistributorPayment(distributorId: string, amount: nu
     const user = await getCurrentUser()
 
     try {
+        // 1. Update distributor debt
         await prisma.$executeRaw`
             UPDATE distributors
             SET "currentDebt" = "currentDebt" - ${amount}
             WHERE id = ${distributorId}
         `
 
+        // 2. Insert credit transaction record
         await prisma.$executeRaw`
             INSERT INTO credit_transactions (id, "distributorId", amount, type, description, "createdAt")
             VALUES (${crypto.randomUUID()}, ${distributorId}, ${amount}, 'abonos', ${description || 'Abono de distribuidor'}, ${new Date()})
