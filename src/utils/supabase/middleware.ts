@@ -61,6 +61,9 @@ export async function updateSession(request: NextRequest) {
         pathname === '/login' ||
         pathname === '/signup' ||
         pathname === '/' ||
+        pathname === '/privacidad' ||
+        pathname === '/terminos' ||
+        pathname.startsWith('/ayuda') ||
         pathname.startsWith('/distribuidores/login') ||
         pathname === '/distribuidores'
 
