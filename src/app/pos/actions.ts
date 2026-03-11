@@ -26,8 +26,6 @@ export async function openRegister(formData: FormData) {
             openingAmount
         }
     })
-
-    revalidatePath('/pos')
 }
 
 export async function closeRegister(formData: FormData) {

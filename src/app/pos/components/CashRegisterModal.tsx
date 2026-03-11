@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Store, Banknote, X, Zap } from 'lucide-react'
 import { openRegister } from '../actions'
 import { cn } from '@/lib/utils'
@@ -10,6 +11,7 @@ import Logo from '@/components/shared/Logo'
 import { useModalAccessibility } from '@/hooks/useModalAccessibility'
 
 export default function CashRegisterModal({ isOpen }: { isOpen: boolean }) {
+    const router = useRouter()
     const [amount, setAmount] = useState('')
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
@@ -68,10 +70,14 @@ export default function CashRegisterModal({ isOpen }: { isOpen: boolean }) {
                                                 formData.append('openingAmount', amount || '0')
                                                 await openRegister(formData)
                                                 setSuccess(true)
+                                                
+                                                // Give time to show the "Terminal Lista" success message
+                                                setTimeout(() => {
+                                                    router.refresh()
+                                                }, 2500)
                                             } catch (error) {
                                                 console.error('Error opening register:', error)
                                                 alert('Error al abrir la caja')
-                                            } finally {
                                                 setLoading(false)
                                             }
                                         }} className="space-y-6 text-left">
